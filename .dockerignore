@@ -1,0 +1,36 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Next.js build output
+.next
+out
+
+# Environment files (never in image)
+.env
+.env.*
+!.env.example
+
+# Dev/IDE
+.git
+.gitignore
+.vscode
+.idea
+*.log
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests & CI
+.github
+coverage
+
+# Misc
+README.md
+CLAUDE.md

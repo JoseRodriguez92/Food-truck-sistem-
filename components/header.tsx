@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -20,10 +21,25 @@ export function Header() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-2xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
-              <span className="text-primary">3</span> STREET<span className="text-muted-foreground font-normal ml-1">food</span>
-            </span>
+          <Link href="/" className="flex items-center">
+            {/* Isotipo: solo en móvil */}
+            <Image
+              src="/isotipo-3SteetFood.svg"
+              alt="3 Street Food"
+              width={40}
+              height={40}
+              className="sm:hidden"
+              priority
+            />
+            {/* Logotipo completo: desktop */}
+            <Image
+              src="/LogoTipo-3StreetFood.svg"
+              alt="3 Street Food"
+              width={160}
+              height={40}
+              className="hidden sm:block"
+              priority
+            />
           </Link>
 
           {/* Desktop Navigation */}

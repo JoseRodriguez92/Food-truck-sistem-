@@ -1,4 +1,5 @@
 import Link from "next/link"
+import Image from "next/image"
 import { Instagram, Facebook, Twitter } from "lucide-react"
 
 const footerLinks = {
@@ -22,9 +23,12 @@ export function Footer() {
           {/* Brand */}
           <div className="col-span-2">
             <Link href="/" className="inline-block">
-              <span className="text-xl sm:text-2xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
-                <span className="text-primary">3</span> STREET<span className="text-muted-foreground font-normal ml-1">food</span>
-              </span>
+              <Image
+                src="/LogoTipo-3StreetFood.svg"
+                alt="3 Street Food"
+                width={160}
+                height={40}
+              />
             </Link>
             <p className="mt-3 sm:mt-4 text-sm sm:text-base text-muted-foreground max-w-sm leading-relaxed">
               Street food con actitud. Dorilocos, Crazy Fries, Boom Fries y Mindoggys. Sabores que explotan.

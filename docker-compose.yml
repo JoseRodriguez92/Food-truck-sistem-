@@ -1,0 +1,19 @@
+# Desarrollo local — usa hot-reload de Next.js
+services:
+  app:
+    build:
+      context: .
+      target: deps
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+    command: npm run dev
+    restart: unless-stopped
