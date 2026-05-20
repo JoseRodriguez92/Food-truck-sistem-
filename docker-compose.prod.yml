@@ -2,7 +2,7 @@
 # Uso: docker compose -f docker-compose.prod.yml up -d
 services:
   app:
-    image: ghcr.io/joserodriguez92/food-truck-sistem-:latest
+    image: ghcr.io/joserodriguez92/food-truck-app:latest
     ports:
       - "3000:3000"
     env_file:

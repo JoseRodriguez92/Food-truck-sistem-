@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: ghcr.io/joserodriguez92/food-truck-app
 
 # ── Job 1: Lint & Build ────────────────────────────────────────────────────────
 jobs:
@@ -59,7 +59,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ghcr.io/joserodriguez92/food-truck-app
           tags: |
             type=sha,prefix=sha-
             type=raw,value=latest
