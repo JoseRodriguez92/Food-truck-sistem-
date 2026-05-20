@@ -22,22 +22,11 @@ export function Header() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center">
-            {/* Isotipo: solo en móvil */}
-            <Image
-              src="/isotipo-3SteetFood.svg"
-              alt="3 Street Food"
-              width={40}
-              height={40}
-              className="sm:hidden"
-              priority
-            />
-            {/* Logotipo completo: desktop */}
             <Image
               src="/LogoTipo-3StreetFood.svg"
               alt="3 Street Food"
               width={160}
               height={40}
-              className="hidden sm:block"
               priority
             />
           </Link>
