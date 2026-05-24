@@ -5,8 +5,15 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  Plus, Pencil, Trash2, Layers, X,
-  ShoppingBasket, LayoutList, LayoutGrid,
+  Plus,
+  Pencil,
+  Trash2,
+  Layers,
+  X,
+  ShoppingBasket,
+  LayoutList,
+  LayoutGrid,
+  ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
@@ -17,13 +24,54 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
-import { createCombo, updateCombo, deleteCombo, addProductToCombo, removeProductFromCombo } from "@/app/admin/combos/actions";
+import { createClient } from "@/lib/supabase/client";
+
+import {
+  createCombo,
+  updateCombo,
+  deleteCombo,
+  addProductToCombo,
+  removeProductFromCombo,
+} from "@/app/admin/combos/actions";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 export type ProductOption = { product_id: number; name: string; price: number };
@@ -48,6 +96,7 @@ export type Combo = {
   name: string;
   description: string | null;
   price: number;
+  image_url: string | null;
   combo_has_product: ComboProduct[];
 };
 
@@ -59,7 +108,11 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 const formatCurrency = (n: number) =>
-  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
+  new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  }).format(n);
 
 function toSingle<T>(v: T | T[] | null | undefined): T | null {
   if (!v) return null;
@@ -67,26 +120,126 @@ function toSingle<T>(v: T | T[] | null | undefined): T | null {
 }
 
 // ── Formulario ────────────────────────────────────────────────────────────────
-function ComboForm({ defaultValues }: { defaultValues?: Partial<FormValues> }) {
-  const { register, formState: { errors } } = useForm<FormValues>({
+function ComboForm({
+  defaultValues,
+  currentImageUrl,
+}: {
+  defaultValues?: Partial<FormValues>;
+  currentImageUrl?: string | null;
+}) {
+  const {
+    register,
+    formState: { errors },
+  } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: defaultValues ?? { name: "", description: "", price: 0 },
   });
+
+  const [imageUrl, setImageUrl] = useState(currentImageUrl ?? "");
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const supabase = createClient();
+    const ext = file.name.split(".").pop();
+    const path = `${Date.now()}.${ext}`;
+    const { data, error } = await supabase.storage
+      .from("combo-images")
+      .upload(path, file, { upsert: true });
+    if (error) {
+      toast.error(error.message);
+      setUploading(false);
+      return;
+    }
+    const { data: { publicUrl } } = supabase.storage
+      .from("combo-images")
+      .getPublicUrl(data.path);
+    setImageUrl(publicUrl);
+    setUploading(false);
+  }
+
   return (
     <form id="combo-form" className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="c-name">Nombre</Label>
-        <Input id="c-name" placeholder="Ej. Combo Familiar" aria-invalid={!!errors.name} {...register("name")} />
-        {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+        <Input
+          id="c-name"
+          placeholder="Ej. Combo Familiar"
+          aria-invalid={!!errors.name}
+          {...register("name")}
+        />
+        {errors.name && (
+          <p className="text-xs text-destructive">{errors.name.message}</p>
+        )}
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="c-desc">Descripción <span className="text-muted-foreground text-xs">(opcional)</span></Label>
-        <Textarea id="c-desc" placeholder="Descripción del combo..." rows={2} {...register("description")} />
+        <Label htmlFor="c-desc">
+          Descripción{" "}
+          <span className="text-muted-foreground text-xs">(opcional)</span>
+        </Label>
+        <Textarea
+          id="c-desc"
+          placeholder="Descripción del combo..."
+          rows={2}
+          {...register("description")}
+        />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="c-price">Precio (COP)</Label>
-        <Input id="c-price" type="number" step="1" min="0" placeholder="0" aria-invalid={!!errors.price} {...register("price")} />
-        {errors.price && <p className="text-xs text-destructive">{errors.price.message}</p>}
+        <Input
+          id="c-price"
+          type="number"
+          step="1"
+          min="0"
+          placeholder="0"
+          aria-invalid={!!errors.price}
+          {...register("price")}
+        />
+        {errors.price && (
+          <p className="text-xs text-destructive">{errors.price.message}</p>
+        )}
+      </div>
+
+      {/* Imagen */}
+      <div className="space-y-1.5">
+        <Label>Imagen <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+        <input type="hidden" name="image_url" value={imageUrl} />
+        {imageUrl ? (
+          <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-border">
+            <Image
+              src={imageUrl}
+              alt="Vista previa"
+              fill
+              className="object-cover"
+              unoptimized
+            />
+            <button
+              type="button"
+              onClick={() => setImageUrl("")}
+              className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 hover:bg-black/80 transition-colors"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
+          <label
+            className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border rounded-lg p-6 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors ${uploading ? "opacity-50 pointer-events-none" : ""}`}
+          >
+            <ImageIcon className="w-6 h-6 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">
+              {uploading ? "Subiendo..." : "Clic para seleccionar imagen"}
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+              disabled={uploading}
+            />
+          </label>
+        )}
       </div>
     </form>
   );
@@ -94,7 +247,9 @@ function ComboForm({ defaultValues }: { defaultValues?: Partial<FormValues> }) {
 
 // ── Panel de productos del combo ───────────────────────────────────────────────
 function ComboProductsPanel({
-  combo, allProducts, onClose,
+  combo,
+  allProducts,
+  onClose,
 }: {
   combo: Combo;
   allProducts: ProductOption[];
@@ -109,9 +264,15 @@ function ComboProductsPanel({
   function handleAdd() {
     if (!selectedId) return;
     startTransition(async () => {
-      const result = await addProductToCombo(combo.combo_id, Number(selectedId));
+      const result = await addProductToCombo(
+        combo.combo_id,
+        Number(selectedId),
+      );
       if (result?.error) toast.error(result.error);
-      else { toast.success("Producto agregado"); setSelectedId(""); }
+      else {
+        toast.success("Producto agregado");
+        setSelectedId("");
+      }
     });
   }
 
@@ -136,22 +297,38 @@ function ComboProductsPanel({
         </DialogHeader>
 
         <div className="flex gap-2">
-          <Select value={selectedId} onValueChange={setSelectedId} disabled={available.length === 0}>
+          <Select
+            value={selectedId}
+            onValueChange={setSelectedId}
+            disabled={available.length === 0}
+          >
             <SelectTrigger className="flex-1">
-              <SelectValue placeholder={available.length === 0 ? "Todos los productos ya están" : "Seleccionar producto..."} />
+              <SelectValue
+                placeholder={
+                  available.length === 0
+                    ? "Todos los productos ya están"
+                    : "Seleccionar producto..."
+                }
+              />
             </SelectTrigger>
             <SelectContent>
               {available.map((p) => (
                 <SelectItem key={p.product_id} value={String(p.product_id)}>
                   <span className="flex items-center justify-between gap-4 w-full">
                     <span>{p.name}</span>
-                    <span className="text-muted-foreground text-xs">{formatCurrency(p.price)}</span>
+                    <span className="text-muted-foreground text-xs">
+                      {formatCurrency(p.price)}
+                    </span>
                   </span>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Button size="icon" onClick={handleAdd} disabled={isPending || !selectedId}>
+          <Button
+            size="icon"
+            onClick={handleAdd}
+            disabled={isPending || !selectedId}
+          >
             <Plus className="w-4 h-4" />
           </Button>
         </div>
@@ -166,14 +343,26 @@ function ComboProductsPanel({
         ) : (
           <div className="space-y-1.5 max-h-64 overflow-y-auto">
             {combo.combo_has_product.map((cp) => {
-              const product = toSingle(cp.product as ComboProductDetail | ComboProductDetail[]);
+              const product = toSingle(
+                cp.product as ComboProductDetail | ComboProductDetail[],
+              );
               const image = product?.product_has_image?.[0];
               return (
-                <div key={cp.combo_product_id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-accent/50 group">
+                <div
+                  key={cp.combo_product_id}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg bg-accent/50 group"
+                >
                   {/* Thumbnail */}
                   <div className="w-10 h-10 rounded-md overflow-hidden shrink-0 bg-muted border border-border">
                     {image ? (
-                      <Image src={image.image_url} alt={product?.name ?? ""} width={40} height={40} className="object-cover w-full h-full" unoptimized />
+                      <Image
+                        src={image.image_url}
+                        alt={product?.name ?? ""}
+                        width={40}
+                        height={40}
+                        className="object-cover w-full h-full"
+                        unoptimized
+                      />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                         <Layers className="w-4 h-4" />
@@ -181,14 +370,23 @@ function ComboProductsPanel({
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{product?.name ?? "Producto eliminado"}</p>
-                    {product && <p className="text-xs text-muted-foreground">{formatCurrency(product.price)}</p>}
+                    <p className="text-sm font-medium truncate">
+                      {product?.name ?? "Producto eliminado"}
+                    </p>
+                    {product && (
+                      <p className="text-xs text-muted-foreground">
+                        {formatCurrency(product.price)}
+                      </p>
+                    )}
                   </div>
                   <Button
-                    variant="ghost" size="icon"
+                    variant="ghost"
+                    size="icon"
                     className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"
                     disabled={isPending}
-                    onClick={() => handleRemove(cp.combo_product_id, product?.name ?? "")}
+                    onClick={() =>
+                      handleRemove(cp.combo_product_id, product?.name ?? "")
+                    }
                   >
                     <X className="w-3.5 h-3.5" />
                   </Button>
@@ -206,7 +404,9 @@ function ComboProductsPanel({
             </div>
             <div className="flex justify-between text-sm font-semibold">
               <span>Precio del combo</span>
-              <span className="text-primary">{formatCurrency(combo.price)}</span>
+              <span className="text-primary">
+                {formatCurrency(combo.price)}
+              </span>
             </div>
             {sumProducts > combo.price && (
               <p className="text-xs text-green-500 mt-1">
@@ -217,7 +417,9 @@ function ComboProductsPanel({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cerrar</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cerrar
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -226,28 +428,40 @@ function ComboProductsPanel({
 
 // ── Card individual ────────────────────────────────────────────────────────────
 function ComboCard({
-  combo, onEdit, onDelete, onProducts,
+  combo,
+  onEdit,
+  onDelete,
+  onProducts,
 }: {
   combo: Combo;
   onEdit: () => void;
   onDelete: () => void;
   onProducts: () => void;
 }) {
-  const products = combo.combo_has_product.map((cp) =>
-    toSingle(cp.product as ComboProductDetail | ComboProductDetail[])
-  ).filter(Boolean) as ComboProductDetail[];
+  const products = combo.combo_has_product
+    .map((cp) =>
+      toSingle(cp.product as ComboProductDetail | ComboProductDetail[]),
+    )
+    .filter(Boolean) as ComboProductDetail[];
 
-  // Mosaico de hasta 4 imágenes
+  // Mosaico de hasta 4 imágenes (solo si el combo no tiene imagen propia)
   const images = products
     .flatMap((p) => p?.product_has_image ?? [])
     .slice(0, 4);
 
   return (
     <div className="flex flex-col rounded-xl border border-border bg-card overflow-hidden hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group">
-
-      {/* Mosaico de fotos */}
+      {/* Imagen del combo o mosaico de productos */}
       <div className="relative aspect-square bg-muted overflow-hidden">
-        {images.length === 0 ? (
+        {combo.image_url ? (
+          <Image
+            src={combo.image_url}
+            alt={combo.name}
+            fill
+            className="object-cover"
+            unoptimized
+          />
+        ) : images.length === 0 ? (
           <button
             onClick={onProducts}
             className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
@@ -256,15 +470,29 @@ function ComboCard({
             <span className="text-xs">Agregar productos</span>
           </button>
         ) : images.length === 1 ? (
-          <Image src={images[0].image_url} alt={combo.name} fill className="object-cover" unoptimized />
+          <Image
+            src={images[0].image_url}
+            alt={combo.name}
+            fill
+            className="object-cover"
+            unoptimized
+          />
         ) : (
-          <div className={`grid h-full w-full gap-0.5 ${images.length === 2 ? "grid-cols-2" : images.length === 3 ? "grid-cols-2" : "grid-cols-2"}`}>
+          <div
+            className={`grid h-full w-full gap-0.5 ${images.length === 2 ? "grid-cols-2" : images.length === 3 ? "grid-cols-2" : "grid-cols-2"}`}
+          >
             {images.map((img, i) => (
               <div
                 key={img.product_image_id}
                 className={`relative overflow-hidden ${images.length === 3 && i === 0 ? "row-span-2" : ""}`}
               >
-                <Image src={img.image_url} alt="" fill className="object-cover" unoptimized />
+                <Image
+                  src={img.image_url}
+                  alt=""
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
               </div>
             ))}
           </div>
@@ -272,7 +500,8 @@ function ComboCard({
 
         {/* Badge cantidad de productos */}
         <span className="absolute bottom-2 left-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded-full">
-          {combo.combo_has_product.length} producto{combo.combo_has_product.length !== 1 ? "s" : ""}
+          {combo.combo_has_product.length} producto
+          {combo.combo_has_product.length !== 1 ? "s" : ""}
         </span>
       </div>
 
@@ -281,7 +510,9 @@ function ComboCard({
         <div>
           <h3 className="font-semibold text-sm leading-tight">{combo.name}</h3>
           {combo.description && (
-            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{combo.description}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+              {combo.description}
+            </p>
           )}
         </div>
 
@@ -289,26 +520,40 @@ function ComboCard({
         {products.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {products.slice(0, 3).map((p) => (
-              <Badge key={p!.product_id} variant="secondary" className="text-xs">
+              <Badge
+                key={p!.product_id}
+                variant="secondary"
+                className="text-xs"
+              >
                 {p!.name}
               </Badge>
             ))}
             {products.length > 3 && (
-              <Badge variant="outline" className="text-xs text-muted-foreground">
+              <Badge
+                variant="outline"
+                className="text-xs text-muted-foreground"
+              >
                 +{products.length - 3}
               </Badge>
             )}
           </div>
         )}
 
-        <p className="text-base font-bold text-primary mt-auto">{formatCurrency(combo.price)}</p>
+        <p className="text-base font-bold text-primary mt-auto">
+          {formatCurrency(combo.price)}
+        </p>
 
         {/* Acciones */}
         <TooltipProvider delayDuration={300}>
           <div className="flex items-center gap-1 pt-2 border-t border-border">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 flex-1" onClick={onEdit}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 flex-1"
+                  onClick={onEdit}
+                >
                   <Pencil className="w-3.5 h-3.5" />
                 </Button>
               </TooltipTrigger>
@@ -316,7 +561,12 @@ function ComboCard({
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 flex-1" onClick={onProducts}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 flex-1"
+                  onClick={onProducts}
+                >
                   <ShoppingBasket className="w-3.5 h-3.5" />
                 </Button>
               </TooltipTrigger>
@@ -324,7 +574,12 @@ function ComboCard({
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 flex-1 hover:text-destructive" onClick={onDelete}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 flex-1 hover:text-destructive"
+                  onClick={onDelete}
+                >
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               </TooltipTrigger>
@@ -338,7 +593,13 @@ function ComboCard({
 }
 
 // ── Vista principal ────────────────────────────────────────────────────────────
-export function CombosView({ combos, allProducts }: { combos: Combo[]; allProducts: ProductOption[] }) {
+export function CombosView({
+  combos,
+  allProducts,
+}: {
+  combos: Combo[];
+  allProducts: ProductOption[];
+}) {
   const [isPending, startTransition] = useTransition();
   const [view, setView] = useState<"grid" | "list">("grid");
   const [createOpen, setCreateOpen] = useState(false);
@@ -346,7 +607,10 @@ export function CombosView({ combos, allProducts }: { combos: Combo[]; allProduc
   const [deleteCombo_, setDeleteCombo] = useState<Combo | null>(null);
   const [productsCombo, setProductsCombo] = useState<Combo | null>(null);
 
-  function submit(action: (fd: FormData) => Promise<{ error: string } | undefined>, onSuccess: () => void) {
+  function submit(
+    action: (fd: FormData) => Promise<{ error: string } | undefined>,
+    onSuccess: () => void,
+  ) {
     const form = document.getElementById("combo-form") as HTMLFormElement;
     if (!form) return;
     startTransition(async () => {
@@ -361,7 +625,10 @@ export function CombosView({ combos, allProducts }: { combos: Combo[]; allProduc
     startTransition(async () => {
       const result = await deleteCombo(deleteCombo_.combo_id);
       if (result?.error) toast.error(result.error);
-      else { toast.success("Combo eliminado"); setDeleteCombo(null); }
+      else {
+        toast.success("Combo eliminado");
+        setDeleteCombo(null);
+      }
     });
   }
 
@@ -377,27 +644,47 @@ export function CombosView({ combos, allProducts }: { combos: Combo[]; allProduc
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold" style={{ fontFamily: "var(--font-space-grotesk)" }}>Combos</h1>
-          <p className="text-sm text-muted-foreground mt-1">{combos.length} combos registrados</p>
+          <h1
+            className="text-2xl sm:text-3xl font-bold"
+            style={{ fontFamily: "var(--font-space-grotesk)" }}
+          >
+            Combos
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {combos.length} combos registrados
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center rounded-lg border border-border p-1 gap-1">
-            <Button variant={view === "grid" ? "default" : "ghost"} size="icon" className="h-7 w-7" onClick={() => setView("grid")}>
+            <Button
+              variant={view === "grid" ? "default" : "ghost"}
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setView("grid")}
+            >
               <LayoutGrid className="w-3.5 h-3.5" />
             </Button>
-            <Button variant={view === "list" ? "default" : "ghost"} size="icon" className="h-7 w-7" onClick={() => setView("list")}>
+            <Button
+              variant={view === "list" ? "default" : "ghost"}
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setView("list")}
+            >
               <LayoutList className="w-3.5 h-3.5" />
             </Button>
           </div>
           <Button onClick={() => setCreateOpen(true)} className="gap-2">
-            <Plus className="w-4 h-4" /><span className="hidden sm:inline">Agregar</span>
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Agregar</span>
           </Button>
         </div>
       </div>
 
       {/* Vista cards */}
-      {view === "grid" && (
-        combos.length === 0 ? empty : (
+      {view === "grid" &&
+        (combos.length === 0 ? (
+          empty
+        ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {combos.map((c) => (
               <ComboCard
@@ -409,19 +696,22 @@ export function CombosView({ combos, allProducts }: { combos: Combo[]; allProduc
               />
             ))}
           </div>
-        )
-      )}
+        ))}
 
       {/* Vista lista */}
       {view === "list" && (
         <div className="rounded-xl border border-border overflow-hidden">
-          {combos.length === 0 ? empty : (
+          {combos.length === 0 ? (
+            empty
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">#</TableHead>
                   <TableHead>Nombre</TableHead>
-                  <TableHead className="hidden md:table-cell">Descripción</TableHead>
+                  <TableHead className="hidden md:table-cell">
+                    Descripción
+                  </TableHead>
                   <TableHead>Productos</TableHead>
                   <TableHead>Precio</TableHead>
                   <TableHead className="w-24 text-right">Acciones</TableHead>
@@ -430,27 +720,48 @@ export function CombosView({ combos, allProducts }: { combos: Combo[]; allProduc
               <TableBody>
                 {combos.map((c) => (
                   <TableRow key={c.combo_id}>
-                    <TableCell className="text-muted-foreground font-mono text-sm">{c.combo_id}</TableCell>
+                    <TableCell className="text-muted-foreground font-mono text-sm">
+                      {c.combo_id}
+                    </TableCell>
                     <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-48 truncate">{c.description ?? "—"}</TableCell>
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-48 truncate">
+                      {c.description ?? "—"}
+                    </TableCell>
                     <TableCell>
-                      <button onClick={() => setProductsCombo(c)} className="flex flex-wrap gap-1 max-w-40">
+                      <button
+                        onClick={() => setProductsCombo(c)}
+                        className="flex flex-wrap gap-1 max-w-40"
+                      >
                         {c.combo_has_product.length === 0 ? (
-                          <Badge variant="outline" className="text-xs gap-1 text-muted-foreground hover:border-primary hover:text-primary transition-colors cursor-pointer">
+                          <Badge
+                            variant="outline"
+                            className="text-xs gap-1 text-muted-foreground hover:border-primary hover:text-primary transition-colors cursor-pointer"
+                          >
                             <Plus className="w-3 h-3" /> Agregar
                           </Badge>
                         ) : (
                           <>
                             {c.combo_has_product.slice(0, 2).map((cp) => {
-                              const p = toSingle(cp.product as ComboProductDetail | ComboProductDetail[]);
+                              const p = toSingle(
+                                cp.product as
+                                  | ComboProductDetail
+                                  | ComboProductDetail[],
+                              );
                               return (
-                                <Badge key={cp.combo_product_id} variant="secondary" className="text-xs cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors">
+                                <Badge
+                                  key={cp.combo_product_id}
+                                  variant="secondary"
+                                  className="text-xs cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
+                                >
                                   {p?.name ?? "—"}
                                 </Badge>
                               );
                             })}
                             {c.combo_has_product.length > 2 && (
-                              <Badge variant="outline" className="text-xs text-muted-foreground cursor-pointer">
+                              <Badge
+                                variant="outline"
+                                className="text-xs text-muted-foreground cursor-pointer"
+                              >
                                 +{c.combo_has_product.length - 2}
                               </Badge>
                             )}
@@ -458,13 +769,25 @@ export function CombosView({ combos, allProducts }: { combos: Combo[]; allProduc
                         )}
                       </button>
                     </TableCell>
-                    <TableCell className="font-medium text-sm">{formatCurrency(c.price)}</TableCell>
+                    <TableCell className="font-medium text-sm">
+                      {formatCurrency(c.price)}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditCombo(c)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setEditCombo(c)}
+                        >
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive" onClick={() => setDeleteCombo(c)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 hover:text-destructive"
+                          onClick={() => setDeleteCombo(c)}
+                        >
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
@@ -480,11 +803,23 @@ export function CombosView({ combos, allProducts }: { combos: Combo[]; allProduc
       {/* Dialog Crear */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Nuevo combo</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Nuevo combo</DialogTitle>
+          </DialogHeader>
           <ComboForm />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-            <Button disabled={isPending} onClick={() => submit(createCombo, () => { toast.success("Combo creado"); setCreateOpen(false); })}>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={isPending}
+              onClick={() =>
+                submit(createCombo, () => {
+                  toast.success("Combo creado");
+                  setCreateOpen(false);
+                })
+              }
+            >
               {isPending ? "Guardando..." : "Crear"}
             </Button>
           </DialogFooter>
@@ -494,11 +829,35 @@ export function CombosView({ combos, allProducts }: { combos: Combo[]; allProduc
       {/* Dialog Editar */}
       <Dialog open={!!editCombo} onOpenChange={(o) => !o && setEditCombo(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Editar combo</DialogTitle></DialogHeader>
-          {editCombo && <ComboForm defaultValues={{ name: editCombo.name, description: editCombo.description ?? "", price: editCombo.price }} />}
+          <DialogHeader>
+            <DialogTitle>Editar combo</DialogTitle>
+          </DialogHeader>
+          {editCombo && (
+            <ComboForm
+              defaultValues={{
+                name: editCombo.name,
+                description: editCombo.description ?? "",
+                price: editCombo.price,
+              }}
+              currentImageUrl={editCombo.image_url}
+            />
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditCombo(null)}>Cancelar</Button>
-            <Button disabled={isPending} onClick={() => submit((fd) => updateCombo(editCombo!.combo_id, fd), () => { toast.success("Combo actualizado"); setEditCombo(null); })}>
+            <Button variant="outline" onClick={() => setEditCombo(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={isPending}
+              onClick={() =>
+                submit(
+                  (fd) => updateCombo(editCombo!.combo_id, fd),
+                  () => {
+                    toast.success("Combo actualizado");
+                    setEditCombo(null);
+                  },
+                )
+              }
+            >
               {isPending ? "Guardando..." : "Guardar"}
             </Button>
           </DialogFooter>
@@ -506,17 +865,27 @@ export function CombosView({ combos, allProducts }: { combos: Combo[]; allProduc
       </Dialog>
 
       {/* AlertDialog Eliminar */}
-      <AlertDialog open={!!deleteCombo_} onOpenChange={(o) => !o && setDeleteCombo(null)}>
+      <AlertDialog
+        open={!!deleteCombo_}
+        onOpenChange={(o) => !o && setDeleteCombo(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar combo?</AlertDialogTitle>
             <AlertDialogDescription>
-              Vas a eliminar <strong className="text-foreground">{deleteCombo_?.name}</strong>. Se eliminarán sus productos asociados. Esta acción no se puede deshacer.
+              Vas a eliminar{" "}
+              <strong className="text-foreground">{deleteCombo_?.name}</strong>.
+              Se eliminarán sus productos asociados. Esta acción no se puede
+              deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={isPending} className="bg-destructive text-white hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isPending}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
               {isPending ? "Eliminando..." : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -525,7 +894,11 @@ export function CombosView({ combos, allProducts }: { combos: Combo[]; allProduc
 
       {/* Panel productos del combo */}
       {productsCombo && (
-        <ComboProductsPanel combo={productsCombo} allProducts={allProducts} onClose={() => setProductsCombo(null)} />
+        <ComboProductsPanel
+          combo={productsCombo}
+          allProducts={allProducts}
+          onClose={() => setProductsCombo(null)}
+        />
       )}
     </div>
   );

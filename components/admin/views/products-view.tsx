@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, Trash2, Package, ImagePlus, X, ExternalLink, Upload, Loader2, LayoutList, LayoutGrid } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, ImagePlus, X, ExternalLink, Upload, Loader2, LayoutList, LayoutGrid, FlaskConical, Tag } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
@@ -14,23 +14,34 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-import { createProduct, updateProduct, deleteProduct, addProductImage, deleteProductImage, addProductType, deleteProductType } from "@/app/admin/products/actions";
+import { createProduct, updateProduct, deleteProduct, addProductImage, deleteProductImage, addProductType, deleteProductType, addProductIngredient, removeProductIngredient, setProductCategory } from "@/app/admin/products/actions";
 
-export type ProductImage = { product_image_id: number; image_url: string };
-export type ProductType  = { product_type_id: number; type: string };
+export type ProductImage      = { product_image_id: number; image_url: string };
+export type ProductType       = { product_type_id: number; type: string };
+export type ProductIngredient = {
+  product_ingredient_id: number;
+  quantity: number;
+  ingredient: { ingredient_id: number; name: string; unit: string };
+};
+export type AvailableIngredient = { ingredient_id: number; name: string; unit: string };
+export type AvailableCategory   = { category_id: number; name: string };
 export type Product = {
   product_id: number;
   name: string;
   description: string | null;
   price: number;
+  category_id: number | null;
+  category: { category_id: number; name: string } | null;
   product_has_image: ProductImage[];
   product_has_type: ProductType[];
+  product_has_ingredient: ProductIngredient[];
 };
 
 const schema = z.object({
@@ -285,6 +296,209 @@ function TypesPanel({ product, onClose }: { product: Product; onClose: () => voi
   );
 }
 
+function IngredientsPanel({
+  product,
+  allIngredients,
+  onClose,
+}: {
+  product: Product;
+  allIngredients: AvailableIngredient[];
+  onClose: () => void;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [selectedIngId, setSelectedIngId] = useState("");
+  const [quantity, setQuantity] = useState("");
+
+  const usedIds = new Set(product.product_has_ingredient.map((i) => i.ingredient.ingredient_id));
+  const available = allIngredients.filter((i) => !usedIds.has(i.ingredient_id));
+  const selectedIng = allIngredients.find((i) => i.ingredient_id === Number(selectedIngId));
+
+  function handleAdd() {
+    if (!selectedIngId || Number(quantity) <= 0) return;
+    startTransition(async () => {
+      const result = await addProductIngredient(product.product_id, Number(selectedIngId), Number(quantity));
+      if (result?.error) toast.error(result.error);
+      else { toast.success("Ingrediente agregado"); setSelectedIngId(""); setQuantity(""); }
+    });
+  }
+
+  function handleRemove(productIngredientId: number) {
+    startTransition(async () => {
+      const result = await removeProductIngredient(productIngredientId);
+      if (result?.error) toast.error(result.error);
+      else toast.success("Ingrediente removido");
+    });
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Receta — {product.name}</DialogTitle>
+        </DialogHeader>
+
+        {product.product_has_ingredient.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">Sin ingredientes asignados</p>
+        ) : (
+          <div className="rounded-lg border border-border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Ingrediente</TableHead>
+                  <TableHead className="text-right">Cantidad</TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {product.product_has_ingredient.map((pi) => (
+                  <TableRow key={pi.product_ingredient_id}>
+                    <TableCell className="font-medium text-sm">{pi.ingredient.name}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {pi.quantity} {pi.ingredient.unit}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive"
+                        disabled={isPending}
+                        onClick={() => handleRemove(pi.product_ingredient_id)}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {allIngredients.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center">
+            Primero crea ingredientes en Catálogo → Ingredientes
+          </p>
+        ) : available.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center">
+            Todos los ingredientes ya están asignados
+          </p>
+        ) : (
+          <div className="flex gap-2 items-end">
+            <div className="flex-1 space-y-1.5">
+              <Label className="text-xs">Ingrediente</Label>
+              <Select value={selectedIngId} onValueChange={setSelectedIngId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {available.map((ing) => (
+                    <SelectItem key={ing.ingredient_id} value={String(ing.ingredient_id)}>
+                      {ing.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-32 space-y-1.5">
+              <Label className="text-xs">
+                Cantidad{selectedIng ? ` (${selectedIng.unit})` : ""}
+              </Label>
+              <Input
+                type="number" min="0" step="0.01" placeholder="0"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+              />
+            </div>
+            <Button
+              size="icon"
+              disabled={isPending || !selectedIngId || Number(quantity) <= 0}
+              onClick={handleAdd}
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cerrar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CategoryPanel({
+  product,
+  allCategories,
+  onClose,
+}: {
+  product: Product;
+  allCategories: AvailableCategory[];
+  onClose: () => void;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [selected, setSelected] = useState<string>(
+    product.category_id ? String(product.category_id) : ""
+  );
+
+  function handleSave() {
+    startTransition(async () => {
+      const result = await setProductCategory(
+        product.product_id,
+        selected ? Number(selected) : null
+      );
+      if (result?.error) toast.error(result.error);
+      else { toast.success("Categoría actualizada"); onClose(); }
+    });
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Categoría — {product.name}</DialogTitle>
+        </DialogHeader>
+
+        {allCategories.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Primero crea categorías en Catálogo → Categorías
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            <Label>Categoría</Label>
+            <Select value={selected} onValueChange={setSelected}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sin categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                {allCategories.map((c) => (
+                  <SelectItem key={c.category_id} value={String(c.category_id)}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selected && (
+              <button
+                className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                onClick={() => setSelected("")}
+              >
+                Quitar categoría
+              </button>
+            )}
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button disabled={isPending || allCategories.length === 0} onClick={handleSave}>
+            {isPending ? "Guardando..." : "Guardar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 const formatCurrency = (n: number) =>
   new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
 
@@ -295,12 +509,16 @@ function ProductCard({
   onDelete,
   onImages,
   onTypes,
+  onIngredients,
+  onCategory,
 }: {
   product: Product;
   onEdit: () => void;
   onDelete: () => void;
   onImages: () => void;
   onTypes: () => void;
+  onIngredients: () => void;
+  onCategory: () => void;
 }) {
   const hasImages = product.product_has_image.length > 0;
 
@@ -356,6 +574,13 @@ function ProductCard({
           )}
         </div>
 
+        {/* Categoría */}
+        {product.category && (
+          <span className="self-start text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">
+            {product.category.name}
+          </span>
+        )}
+
         {/* Tipos */}
         {product.product_has_type.length > 0 && (
           <div className="flex flex-wrap gap-1">
@@ -399,6 +624,22 @@ function ProductCard({
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 flex-1" onClick={onIngredients}>
+                  <FlaskConical className="w-3.5 h-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Receta</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 flex-1" onClick={onCategory}>
+                  <Tag className="w-3.5 h-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Categoría</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8 flex-1 hover:text-destructive" onClick={onDelete}>
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
@@ -412,7 +653,7 @@ function ProductCard({
   );
 }
 
-export function ProductsView({ products }: { products: Product[] }) {
+export function ProductsView({ products, allIngredients, allCategories }: { products: Product[]; allIngredients: AvailableIngredient[]; allCategories: AvailableCategory[] }) {
   const [isPending, startTransition] = useTransition();
   const [view, setView] = useState<"list" | "grid">("grid");
   const [createOpen, setCreateOpen] = useState(false);
@@ -420,6 +661,8 @@ export function ProductsView({ products }: { products: Product[] }) {
   const [deleteProduct_, setDeleteProduct] = useState<Product | null>(null);
   const [imagesProduct, setImagesProduct] = useState<Product | null>(null);
   const [typesProduct, setTypesProduct] = useState<Product | null>(null);
+  const [ingredientsProduct, setIngredientsProduct] = useState<Product | null>(null);
+  const [categoryProduct, setCategoryProduct] = useState<Product | null>(null);
 
   function handleCreate(fd: FormData) {
     startTransition(async () => {
@@ -497,6 +740,8 @@ export function ProductsView({ products }: { products: Product[] }) {
                 onDelete={() => setDeleteProduct(p)}
                 onImages={() => setImagesProduct(p)}
                 onTypes={() => setTypesProduct(p)}
+                onIngredients={() => setIngredientsProduct(p)}
+                onCategory={() => setCategoryProduct(p)}
               />
             ))}
           </div>
@@ -519,8 +764,10 @@ export function ProductsView({ products }: { products: Product[] }) {
                 <TableHead>Nombre</TableHead>
                 <TableHead className="hidden md:table-cell">Descripción</TableHead>
                 <TableHead>Precio</TableHead>
+                <TableHead>Categoría</TableHead>
                 <TableHead>Tipos</TableHead>
                 <TableHead>Imágenes</TableHead>
+                <TableHead>Receta</TableHead>
                 <TableHead className="w-28 text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -529,6 +776,25 @@ export function ProductsView({ products }: { products: Product[] }) {
                 <TableRow key={p.product_id}>
                   <TableCell className="text-muted-foreground font-mono text-sm">{p.product_id}</TableCell>
                   <TableCell className="font-medium">{p.name}</TableCell>
+                  <TableCell>
+                    {p.category ? (
+                      <Badge
+                        variant="outline"
+                        className="text-xs cursor-pointer hover:bg-accent gap-1"
+                        onClick={() => setCategoryProduct(p)}
+                      >
+                        <Tag className="w-3 h-3" />{p.category.name}
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="text-xs cursor-pointer text-muted-foreground hover:bg-accent gap-1"
+                        onClick={() => setCategoryProduct(p)}
+                      >
+                        <Plus className="w-3 h-3" />Asignar
+                      </Badge>
+                    )}
+                  </TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-48 truncate">{p.description ?? "—"}</TableCell>
                   <TableCell className="font-medium text-sm">{formatCurrency(p.price)}</TableCell>
                   <TableCell>
@@ -572,6 +838,16 @@ export function ProductsView({ products }: { products: Product[] }) {
                     >
                       <ImagePlus className="w-3 h-3" />
                       {p.product_has_image.length}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className="cursor-pointer hover:bg-accent text-xs gap-1"
+                      onClick={() => setIngredientsProduct(p)}
+                    >
+                      <FlaskConical className="w-3 h-3" />
+                      {p.product_has_ingredient.length}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
@@ -649,6 +925,24 @@ export function ProductsView({ products }: { products: Product[] }) {
 
       {/* Panel de tipos */}
       {typesProduct && <TypesPanel product={typesProduct} onClose={() => setTypesProduct(null)} />}
+
+      {/* Panel de categoría */}
+      {categoryProduct && (
+        <CategoryPanel
+          product={categoryProduct}
+          allCategories={allCategories}
+          onClose={() => setCategoryProduct(null)}
+        />
+      )}
+
+      {/* Panel de ingredientes / receta */}
+      {ingredientsProduct && (
+        <IngredientsPanel
+          product={ingredientsProduct}
+          allIngredients={allIngredients}
+          onClose={() => setIngredientsProduct(null)}
+        />
+      )}
     </div>
   );
 }

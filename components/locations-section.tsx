@@ -1,30 +1,58 @@
-import { MapPin, Clock } from "lucide-react"
+import { createClient } from '@/lib/supabase/server'
+import { LocationsFilterClient } from '@/components/locations-filter-client'
+import type { MapLocation } from '@/components/locations-map'
 
-const locations = [
-  {
-    id: 1,
-    name: "Centro Histórico",
-    address: "Av. Principal #123, Centro",
-    schedule: "Lun - Vie: 11am - 9pm",
-    active: true,
-  },
-  {
-    id: 2,
-    name: "Zona Norte",
-    address: "Plaza Comercial Norte, Local 45",
-    schedule: "Mar - Sáb: 12pm - 10pm",
-    active: true,
-  },
-  {
-    id: 3,
-    name: "Parque Central",
-    address: "Junto al Parque Central",
-    schedule: "Sáb - Dom: 10am - 8pm",
-    active: false,
-  },
-]
+async function geocode(
+  address: string,
+  city: string,
+  country: string
+): Promise<{ lat: number; lng: number } | null> {
+  const q = [address, city, country].filter(Boolean).join(', ')
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,
+      {
+        headers: { 'User-Agent': 'TresStreetFood/1.0 (contact@tresstreetfood.com)' },
+        next: { revalidate: 86400 },
+      }
+    )
+    const data = await res.json()
+    if (data[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
+  } catch {}
+  return null
+}
 
-export function LocationsSection() {
+export async function LocationsSection() {
+  const supabase = await createClient()
+
+  const [{ data: rows }, { data: trucks }] = await Promise.all([
+    supabase
+      .from('location')
+      .select('*, food_truck(food_truck_id, name, color)')
+      .order('location_id'),
+    supabase.from('food_truck').select('food_truck_id, name, color').order('name'),
+  ])
+
+  const locations: MapLocation[] = await Promise.all(
+    (rows ?? []).map(async (loc) => {
+      const ft = loc.food_truck as { food_truck_id: number; name: string; color: string | null } | null
+      const coords =
+        loc.latitude != null && loc.longitude != null
+          ? { lat: loc.latitude, lng: loc.longitude }
+          : await geocode(loc.address ?? '', loc.city ?? '', loc.country ?? 'México')
+      return {
+        id: loc.location_id,
+        name: loc.name,
+        address: [loc.address, loc.city].filter(Boolean).join(', '),
+        active: loc.estatus ?? true,
+        lat: coords?.lat ?? 19.4326,
+        lng: coords?.lng ?? -99.1332,
+        food_truck_id: ft?.food_truck_id,
+        food_truck_name: ft?.name,
+      }
+    })
+  )
+
   return (
     <section id="ubicaciones" className="py-16 sm:py-20 lg:py-24 bg-card">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -33,7 +61,7 @@ export function LocationsSection() {
           <span className="inline-block px-3 sm:px-4 py-1 sm:py-1.5 bg-primary/10 text-primary text-xs sm:text-sm font-medium rounded-full mb-3 sm:mb-4">
             Encuéntranos
           </span>
-          <h2 
+          <h2
             className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground"
             style={{ fontFamily: 'var(--font-display)' }}
           >
@@ -44,45 +72,29 @@ export function LocationsSection() {
           </p>
         </div>
 
-        {/* Locations Grid */}
-        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-          {locations.map((location) => (
-            <div 
-              key={location.id}
-              className={`relative bg-background rounded-xl sm:rounded-2xl border p-4 sm:p-6 transition-all ${
-                location.active 
-                  ? "border-primary/50 hover:shadow-lg hover:shadow-primary/5" 
-                  : "border-border opacity-60"
-              }`}
-            >
-              {location.active && (
-                <span className="absolute -top-2 sm:-top-3 right-3 sm:right-4 px-2 sm:px-3 py-0.5 sm:py-1 bg-green-500/20 text-green-400 text-[10px] sm:text-xs font-semibold rounded-full flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-400 rounded-full animate-pulse" />
-                  Activo Hoy
-                </span>
-              )}
-              <div className="flex items-start gap-3 sm:gap-4 mb-3 sm:mb-4">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="text-base sm:text-lg font-semibold text-foreground">{location.name}</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground">{location.address}</p>
+        {locations.length > 0 ? (
+          <LocationsFilterClient
+            locations={locations}
+            trucks={(trucks ?? []) as { food_truck_id: number; name: string; color: string | null }[]}
+          />
+        ) : (
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="bg-background rounded-xl sm:rounded-2xl border border-border p-4 sm:p-6 animate-pulse"
+              >
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="w-10 h-10 bg-muted rounded-lg shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-muted rounded w-3/4" />
+                    <div className="h-3 bg-muted rounded w-full" />
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span>{location.schedule}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Map Placeholder */}
-        <div className="mt-8 sm:mt-12 bg-background rounded-xl sm:rounded-2xl border border-border p-6 sm:p-8 text-center">
-          <div className="text-5xl sm:text-6xl mb-3 sm:mb-4">🗺️</div>
-          <p className="text-sm sm:text-base text-muted-foreground">Mapa interactivo próximamente</p>
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   )

@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      category: {
+        Row: {
+          category_id: number
+          created_at: string
+          description: string | null
+          name: string
+        }
+        Insert: {
+          category_id?: number
+          created_at?: string
+          description?: string | null
+          name: string
+        }
+        Update: {
+          category_id?: number
+          created_at?: string
+          description?: string | null
+          name?: string
+        }
+        Relationships: []
+      }
       combo: {
         Row: {
           combo_id: number
@@ -113,50 +134,227 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_info: {
+        Row: {
+          banco: string | null
+          ciudad: string | null
+          created_at: string
+          employee_info_id: string
+          metodo_pago: string | null
+          numero_cuenta: string | null
+          profile_id: string
+          tipo_contrato: string | null
+          tipo_cuenta: string | null
+          tipo_trabajador: string | null
+        }
+        Insert: {
+          banco?: string | null
+          ciudad?: string | null
+          created_at?: string
+          employee_info_id?: string
+          metodo_pago?: string | null
+          numero_cuenta?: string | null
+          profile_id: string
+          tipo_contrato?: string | null
+          tipo_cuenta?: string | null
+          tipo_trabajador?: string | null
+        }
+        Update: {
+          banco?: string | null
+          ciudad?: string | null
+          created_at?: string
+          employee_info_id?: string
+          metodo_pago?: string | null
+          numero_cuenta?: string | null
+          profile_id?: string
+          tipo_contrato?: string | null
+          tipo_cuenta?: string | null
+          tipo_trabajador?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_info_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       food_truck: {
         Row: {
           color: string | null
+          estatus: boolean | null
           food_truck_id: number
           name: string
           registration: string
         }
         Insert: {
           color?: string | null
+          estatus?: boolean | null
           food_truck_id?: never
           name: string
           registration: string
         }
         Update: {
           color?: string | null
+          estatus?: boolean | null
           food_truck_id?: never
           name?: string
           registration?: string
         }
         Relationships: []
       }
+      ingredient: {
+        Row: {
+          created_at: string
+          description: string | null
+          ingredient_id: number
+          name: string
+          stock: number
+          unit: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          ingredient_id?: number
+          name: string
+          stock?: number
+          unit?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          ingredient_id?: number
+          name?: string
+          stock?: number
+          unit?: string
+        }
+        Relationships: []
+      }
+      liquidacion: {
+        Row: {
+          created_at: string
+          dias_trabajados: number
+          liquidacion_id: string
+          mes_reportado: string
+          neto_pagado: number
+          profile_id: string
+          salario_basico: number
+          total_deducciones: number
+          total_devengado: number
+        }
+        Insert: {
+          created_at?: string
+          dias_trabajados?: number
+          liquidacion_id?: string
+          mes_reportado: string
+          neto_pagado?: number
+          profile_id: string
+          salario_basico?: number
+          total_deducciones?: number
+          total_devengado?: number
+        }
+        Update: {
+          created_at?: string
+          dias_trabajados?: number
+          liquidacion_id?: string
+          mes_reportado?: string
+          neto_pagado?: number
+          profile_id?: string
+          salario_basico?: number
+          total_deducciones?: number
+          total_devengado?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "liquidacion_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      liquidacion_concepto: {
+        Row: {
+          base: number | null
+          cantidad: number | null
+          concepto: string
+          concepto_id: string
+          liquidacion_id: string
+          orden: number
+          porcentaje: number | null
+          tipo: string
+          unidad: string | null
+          valor: number
+        }
+        Insert: {
+          base?: number | null
+          cantidad?: number | null
+          concepto: string
+          concepto_id?: string
+          liquidacion_id: string
+          orden?: number
+          porcentaje?: number | null
+          tipo: string
+          unidad?: string | null
+          valor?: number
+        }
+        Update: {
+          base?: number | null
+          cantidad?: number | null
+          concepto?: string
+          concepto_id?: string
+          liquidacion_id?: string
+          orden?: number
+          porcentaje?: number | null
+          tipo?: string
+          unidad?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "liquidacion_concepto_liquidacion_id_fkey"
+            columns: ["liquidacion_id"]
+            isOneToOne: false
+            referencedRelation: "liquidacion"
+            referencedColumns: ["liquidacion_id"]
+          },
+        ]
+      }
       location: {
         Row: {
           address: string | null
           city: string | null
           country: string | null
+          estatus: boolean | null
           food_truck_id: number
+          latitude: number | null
           location_id: number
+          longitude: number | null
           name: string
         }
         Insert: {
           address?: string | null
           city?: string | null
           country?: string | null
+          estatus?: boolean | null
           food_truck_id: number
+          latitude?: number | null
           location_id?: never
+          longitude?: number | null
           name: string
         }
         Update: {
           address?: string | null
           city?: string | null
           country?: string | null
+          estatus?: boolean | null
           food_truck_id?: number
+          latitude?: number | null
           location_id?: never
+          longitude?: number | null
           name?: string
         }
         Relationships: [
@@ -406,24 +604,35 @@ export type Database = {
       }
       product: {
         Row: {
+          category_id: number | null
           description: string | null
           name: string
           price: number
           product_id: number
         }
         Insert: {
+          category_id?: number | null
           description?: string | null
           name: string
           price?: number
           product_id?: never
         }
         Update: {
+          category_id?: number | null
           description?: string | null
           name?: string
           price?: number
           product_id?: never
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "product_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "category"
+            referencedColumns: ["category_id"]
+          },
+        ]
       }
       product_has_image: {
         Row: {
@@ -444,6 +653,42 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "product_has_image_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product"
+            referencedColumns: ["product_id"]
+          },
+        ]
+      }
+      product_has_ingredient: {
+        Row: {
+          ingredient_id: number
+          product_id: number
+          product_ingredient_id: number
+          quantity: number
+        }
+        Insert: {
+          ingredient_id: number
+          product_id: number
+          product_ingredient_id?: number
+          quantity: number
+        }
+        Update: {
+          ingredient_id?: number
+          product_id?: number
+          product_ingredient_id?: number
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_has_ingredient_ingredient_id_fkey"
+            columns: ["ingredient_id"]
+            isOneToOne: false
+            referencedRelation: "ingredient"
+            referencedColumns: ["ingredient_id"]
+          },
+          {
+            foreignKeyName: "product_has_ingredient_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "product"

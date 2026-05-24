@@ -85,3 +85,32 @@ export async function deleteProductType(productTypeId: number) {
   if (error) return { error: error.message };
   revalidatePath("/admin/products");
 }
+
+export async function addProductIngredient(productId: number, ingredientId: number, quantity: number) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("product_has_ingredient")
+    .insert({ product_id: productId, ingredient_id: ingredientId, quantity });
+  if (error) return { error: error.message };
+  revalidatePath("/admin/products");
+}
+
+export async function setProductCategory(productId: number, categoryId: number | null) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("product")
+    .update({ category_id: categoryId })
+    .eq("product_id", productId);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/products");
+}
+
+export async function removeProductIngredient(productIngredientId: number) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("product_has_ingredient")
+    .delete()
+    .eq("product_ingredient_id", productIngredientId);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/products");
+}

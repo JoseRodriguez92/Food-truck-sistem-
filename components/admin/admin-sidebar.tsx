@@ -16,11 +16,12 @@ import {
   BookOpen,
   Users,
   Shield,
+  Leaf,
+  Tag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { logout } from "@/app/login/actions";
 import { ProfilePopover } from "@/components/admin/profile-popover";
 
 interface Profile {
@@ -43,9 +44,11 @@ const truckLinks = [
 
 // Sub-items del acordeón Catálogo
 const catalogLinks = [
-  { href: "/admin/products", label: "Productos", icon: Package },
-  { href: "/admin/combos",   label: "Combos",    icon: Layers },
-  { href: "/admin/menus",    label: "Menús",     icon: BookOpen },
+  { href: "/admin/ingredients",  label: "Ingredientes", icon: Leaf },
+  { href: "/admin/categories",   label: "Categorías",   icon: Tag },
+  { href: "/admin/products",     label: "Productos",    icon: Package },
+  { href: "/admin/combos",       label: "Combos",       icon: Layers },
+  { href: "/admin/menus",        label: "Menús",        icon: BookOpen },
 ];
 
 // Sub-items del acordeón Usuarios
@@ -222,18 +225,6 @@ function NavItems({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
 export function AdminSidebar({ profile }: { profile: Profile | null }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-
-  const displayName =
-    profile?.first_name
-      ? `${profile.first_name} ${profile.last_name ?? ""}`.trim()
-      : profile?.email ?? "Admin";
-
-  const initials = displayName
-    .split(" ")
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 
   const UserFooter = () => <ProfilePopover profile={profile} />;
 

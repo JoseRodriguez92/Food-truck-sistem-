@@ -1,25 +1,27 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import Image from "next/image"
-import { Menu, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { Menu, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const navItems = [
   { label: "Productos", href: "#productos" },
   { label: "Historia", href: "#historia" },
   { label: "Ubicaciones", href: "#ubicaciones" },
   { label: "Contacto", href: "#contacto" },
-]
+];
 
 export function Header() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const router = useRouter();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
+        <div className="flex py-4 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center">
             <Image
@@ -46,7 +48,10 @@ export function Header() {
 
           {/* CTA Button */}
           <div className="hidden md:flex items-center gap-4">
-            <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold">
+            <Button
+              asChild
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
+            >
               <Link href="/login">Pide Online</Link>
             </Button>
           </div>
@@ -80,15 +85,19 @@ export function Header() {
                   {item.label}
                 </Link>
               ))}
-              <Button asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold mt-2">
-                <Link href="#pedir" onClick={() => setMobileMenuOpen(false)}>
-                  Pide Online
-                </Link>
+              <Button
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold mt-2"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  router.push("/login");
+                }}
+              >
+                Pide Online
               </Button>
             </nav>
           </div>
         )}
       </div>
     </header>
-  )
+  );
 }

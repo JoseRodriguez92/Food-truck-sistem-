@@ -10,7 +10,7 @@ export default async function CombosPage() {
     supabase
       .from("combo")
       .select(`
-        combo_id, name, description, price,
+        combo_id, name, description, price, image_url,
         combo_has_product(
           combo_product_id,
           product_id,

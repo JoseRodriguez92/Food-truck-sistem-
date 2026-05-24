@@ -12,7 +12,7 @@ export default async function MenusPage() {
         .from("menu")
         .select(`
           menu_id, name, description, food_truck_id,
-          food_truck(name),
+          food_truck(name, color),
           menu_has_product(
             menu_product_id, product_id,
             product(product_id, name, price,

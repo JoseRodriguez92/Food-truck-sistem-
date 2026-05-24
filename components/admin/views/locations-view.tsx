@@ -5,19 +5,87 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, Trash2, MapPin, X, BookOpen, ChevronRight, Eye, Package, Layers, Loader2 } from "lucide-react";
+import dynamic from "next/dynamic";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  MapPin,
+  X,
+  BookOpen,
+  ChevronRight,
+  Eye,
+  Package,
+  Layers,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
 
+const MapPreview = dynamic(
+  () => import("@/components/admin/map-preview").then((m) => m.MapPreview),
+  {
+    ssr: false,
+    loading: () => <div className="w-full h-full bg-muted animate-pulse" />,
+  },
+);
+
+const LocationsMapClient = dynamic(
+  () =>
+    import("@/components/locations-map-client").then(
+      (m) => m.LocationsMapClient,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full bg-muted animate-pulse rounded-xl" />
+    ),
+  },
+);
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   createLocation,
@@ -31,14 +99,21 @@ import { LocationQR } from "@/components/admin/location-qr";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-export type TruckOption = { food_truck_id: number; name: string; color: string | null };
-export type MenuOption  = { menu_id: number; name: string };
+export type TruckOption = {
+  food_truck_id: number;
+  name: string;
+  color: string | null;
+};
+export type MenuOption = { menu_id: number; name: string };
 
 // Tipo simple para la tabla (query liviano)
 type LocationMenu = {
   location_menu_id: number;
   menu_id: number;
-  menu: { menu_id: number; name: string } | { menu_id: number; name: string }[] | null;
+  menu:
+    | { menu_id: number; name: string }
+    | { menu_id: number; name: string }[]
+    | null;
 };
 
 export type Location = {
@@ -47,14 +122,20 @@ export type Location = {
   address: string | null;
   city: string | null;
   country: string | null;
+  estatus: boolean;
+  latitude: number | null;
+  longitude: number | null;
   food_truck_id: number;
-  food_truck: { food_truck_id: number; name: string; color: string | null } | { food_truck_id: number; name: string; color: string | null }[] | null;
+  food_truck:
+    | { food_truck_id: number; name: string; color: string | null }
+    | { food_truck_id: number; name: string; color: string | null }[]
+    | null;
   location_has_menu: LocationMenu[];
 };
 
 // Tipo del detalle completo (cargado on-demand)
 type ProductImage = { image_url: string };
-type ProductType  = { product_type_id: number; type: string };
+type ProductType = { product_type_id: number; type: string };
 
 type DetailProduct = {
   menu_product_id: number;
@@ -63,7 +144,7 @@ type DetailProduct = {
     product_id: number;
     name: string;
     price: number;
-    product_has_type:  ProductType  | ProductType[]  | null;
+    product_has_type: ProductType | ProductType[] | null;
     product_has_image: ProductImage | ProductImage[] | null;
   } | null;
 };
@@ -92,14 +173,14 @@ type MenuDetail = {
   menu_id: number;
   name: string;
   menu_has_product: DetailProduct | DetailProduct[] | null;
-  menu_has_combo:   DetailCombo   | DetailCombo[]   | null;
+  menu_has_combo: DetailCombo | DetailCombo[] | null;
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function toSingle<T>(v: T | T[] | null): T | null {
   if (!v) return null;
-  return Array.isArray(v) ? v[0] ?? null : v;
+  return Array.isArray(v) ? (v[0] ?? null) : v;
 }
 
 function toArray<T>(v: T | T[] | null): T[] {
@@ -108,10 +189,16 @@ function toArray<T>(v: T | T[] | null): T[] {
 }
 
 function formatCOP(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  }).format(n);
 }
 
-function getProductThumb(product: { product_has_image: ProductImage | ProductImage[] | null } | null): string | null {
+function getProductThumb(
+  product: { product_has_image: ProductImage | ProductImage[] | null } | null,
+): string | null {
   if (!product) return null;
   return toArray(product.product_has_image)[0]?.image_url ?? null;
 }
@@ -119,54 +206,235 @@ function getProductThumb(product: { product_has_image: ProductImage | ProductIma
 // ─── Schema ────────────────────────────────────────────────────────────────────
 
 const schema = z.object({
-  name:          z.string().min(1, "El nombre es requerido"),
-  address:       z.string().optional(),
-  city:          z.string().optional(),
-  country:       z.string().optional(),
+  name: z.string().min(1, "El nombre es requerido"),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  country: z.string().optional(),
   food_truck_id: z.string().min(1, "Selecciona un food truck"),
+  estatus: z.boolean().default(true),
+  latitude: z.coerce.number().optional(),
+  longitude: z.coerce.number().optional(),
 });
 type FormValues = z.infer<typeof schema>;
 
 // ─── Location Form ─────────────────────────────────────────────────────────────
 
-function LocationForm({ defaultValues, trucks }: { defaultValues?: Partial<FormValues>; trucks: TruckOption[] }) {
-  const { register, formState: { errors } } = useForm<FormValues>({
+function LocationForm({
+  defaultValues,
+  trucks,
+}: {
+  defaultValues?: Partial<FormValues>;
+  trucks: TruckOption[];
+}) {
+  const {
+    register,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: defaultValues ?? { name: "", address: "", city: "", country: "", food_truck_id: "" },
+    defaultValues: defaultValues ?? {
+      name: "",
+      address: "",
+      city: "",
+      country: "",
+      food_truck_id: "",
+    },
   });
+  const [geocoding, setGeocoding] = useState(false);
+
+  const latRaw = watch("latitude");
+  const lngRaw = watch("longitude");
+  const latNum = Number(latRaw);
+  const lngNum = Number(lngRaw);
+  const hasCoords =
+    !isNaN(latNum) && !isNaN(lngNum) && latNum !== 0 && lngNum !== 0;
+  // Bogotá como centro por defecto si no hay coords aún
+  const mapLat = hasCoords ? latNum : 4.711;
+  const mapLng = hasCoords ? lngNum : -74.0721;
+
+  async function detectCoords() {
+    const [address, city, country] = [
+      watch("address"),
+      watch("city"),
+      watch("country"),
+    ];
+    const q = [address, city, country].filter(Boolean).join(", ");
+    if (!q) {
+      toast.error("Ingresa al menos dirección, ciudad o país");
+      return;
+    }
+    setGeocoding(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,
+        { headers: { "User-Agent": "TresStreetFood/1.0" } },
+      );
+      const data = await res.json();
+      if (data[0]) {
+        setValue("latitude", parseFloat(data[0].lat));
+        setValue("longitude", parseFloat(data[0].lon));
+        toast.success("Coordenadas detectadas");
+      } else {
+        toast.error("No se encontraron coordenadas para esta dirección");
+      }
+    } catch {
+      toast.error("Error al detectar coordenadas");
+    } finally {
+      setGeocoding(false);
+    }
+  }
 
   return (
     <form id="location-form" className="space-y-4">
       <div className="space-y-1.5">
-        <Label htmlFor="l-truck">Food Truck</Label>
-        <select
-          id="l-truck"
-          {...register("food_truck_id")}
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        <Label>Food Truck</Label>
+        <Select
+          value={watch("food_truck_id")}
+          onValueChange={(v) =>
+            setValue("food_truck_id", v, { shouldValidate: true })
+          }
         >
-          <option value="">Selecciona un food truck...</option>
-          {trucks.map((t) => <option key={t.food_truck_id} value={t.food_truck_id}>{t.name}</option>)}
-        </select>
-        {errors.food_truck_id && <p className="text-xs text-destructive">{errors.food_truck_id.message}</p>}
+          <SelectTrigger>
+            <SelectValue placeholder="Selecciona un food truck..." />
+          </SelectTrigger>
+          <SelectContent>
+            {trucks.map((t) => (
+              <SelectItem key={t.food_truck_id} value={String(t.food_truck_id)}>
+                {t.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <input
+          type="hidden"
+          name="food_truck_id"
+          value={watch("food_truck_id") ?? ""}
+        />
+        {errors.food_truck_id && (
+          <p className="text-xs text-destructive">
+            {errors.food_truck_id.message}
+          </p>
+        )}
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="l-name">Nombre de la ubicación</Label>
-        <Input id="l-name" placeholder="Ej. Sede Centro, Parque el Lago..." aria-invalid={!!errors.name} {...register("name")} />
-        {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+        <Input
+          id="l-name"
+          placeholder="Ej. Sede Centro, Parque el Lago..."
+          aria-invalid={!!errors.name}
+          {...register("name")}
+        />
+        {errors.name && (
+          <p className="text-xs text-destructive">{errors.name.message}</p>
+        )}
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="l-address">Dirección <span className="text-muted-foreground text-xs">(opcional)</span></Label>
-        <Input id="l-address" placeholder="Ej. Cra 7 #45-10" {...register("address")} />
+        <Label htmlFor="l-address">
+          Dirección{" "}
+          <span className="text-muted-foreground text-xs">(opcional)</span>
+        </Label>
+        <Input
+          id="l-address"
+          placeholder="Ej. Cra 7 #45-10"
+          {...register("address")}
+        />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label htmlFor="l-city">Ciudad <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+          <Label htmlFor="l-city">
+            Ciudad{" "}
+            <span className="text-muted-foreground text-xs">(opcional)</span>
+          </Label>
           <Input id="l-city" placeholder="Ej. Bogotá" {...register("city")} />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="l-country">País <span className="text-muted-foreground text-xs">(opcional)</span></Label>
-          <Input id="l-country" placeholder="Ej. Colombia" {...register("country")} />
+          <Label htmlFor="l-country">
+            País{" "}
+            <span className="text-muted-foreground text-xs">(opcional)</span>
+          </Label>
+          <Input
+            id="l-country"
+            placeholder="Ej. Colombia"
+            {...register("country")}
+          />
         </div>
+      </div>
+
+      {/* Coordenadas */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <Label>
+            Coordenadas{" "}
+            <span className="text-muted-foreground text-xs">(opcional)</span>
+          </Label>
+          <button
+            type="button"
+            onClick={detectCoords}
+            disabled={geocoding}
+            className="flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50"
+          >
+            {geocoding ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <MapPin className="w-3 h-3" />
+            )}
+            Detectar automáticamente
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label htmlFor="l-lat" className="text-xs text-muted-foreground">
+              Latitud
+            </Label>
+            <Input
+              id="l-lat"
+              type="number"
+              step="any"
+              placeholder="19.4326"
+              {...register("latitude")}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="l-lng" className="text-xs text-muted-foreground">
+              Longitud
+            </Label>
+            <Input
+              id="l-lng"
+              type="number"
+              step="any"
+              placeholder="-99.1332"
+              {...register("longitude")}
+            />
+          </div>
+        </div>
+        <div className="h-44 rounded-lg overflow-hidden border border-border">
+          <MapPreview
+            lat={mapLat}
+            lng={mapLng}
+            onCoordChange={(lat, lng) => {
+              setValue("latitude", parseFloat(lat.toFixed(6)));
+              setValue("longitude", parseFloat(lng.toFixed(6)));
+            }}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Si no se ingresan, el mapa público usará geocodificación automática
+          por dirección.
+        </p>
+      </div>
+
+      {/* Status */}
+      <div className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
+        <div>
+          <p className="text-sm font-medium">Ubicación activa</p>
+          <p className="text-xs text-muted-foreground">Visible en el mapa público y en el menú</p>
+        </div>
+        <Switch
+          checked={watch("estatus") ?? true}
+          onCheckedChange={(v) => setValue("estatus", v)}
+        />
+        <input type="hidden" name="estatus" value={watch("estatus") ? "true" : "false"} />
       </div>
     </form>
   );
@@ -185,9 +453,9 @@ function MenuDetailSheet({
   open: boolean;
   onClose: () => void;
 }) {
-  const [detail, setDetail]   = useState<MenuDetail | null>(null);
+  const [detail, setDetail] = useState<MenuDetail | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -203,13 +471,14 @@ function MenuDetailSheet({
 
   // Agrupar productos por type
   const rawProducts = toArray(detail?.menu_has_product ?? null);
-  const rawCombos   = toArray(detail?.menu_has_combo ?? null);
+  const rawCombos = toArray(detail?.menu_has_combo ?? null);
 
   const groups = new Map<string, DetailProduct[]>();
   for (const mp of rawProducts) {
     if (!mp.product) continue;
     const types = toArray(mp.product.product_has_type);
-    const keys = types.length === 0 ? ["Sin categoría"] : types.map((t) => t.type);
+    const keys =
+      types.length === 0 ? ["Sin categoría"] : types.map((t) => t.type);
     for (const key of keys) {
       const existing = groups.get(key) ?? [];
       groups.set(key, [...existing, mp]);
@@ -235,7 +504,8 @@ function MenuDetailSheet({
           </SheetTitle>
           {detail && (
             <p className="text-xs text-muted-foreground">
-              {rawProducts.length} producto{rawProducts.length !== 1 ? "s" : ""} · {combos.length} combo{combos.length !== 1 ? "s" : ""}
+              {rawProducts.length} producto{rawProducts.length !== 1 ? "s" : ""}{" "}
+              · {combos.length} combo{combos.length !== 1 ? "s" : ""}
             </p>
           )}
         </SheetHeader>
@@ -253,22 +523,44 @@ function MenuDetailSheet({
         )}
 
         {!loading && !error && detail && (
-          <Tabs defaultValue="products" className="flex flex-col flex-1 min-h-0">
+          <Tabs
+            defaultValue="products"
+            className="flex flex-col flex-1 min-h-0"
+          >
             <TabsList className="mx-5 mt-4 shrink-0">
-              <TabsTrigger value="products" className="flex items-center gap-1.5 flex-1">
+              <TabsTrigger
+                value="products"
+                className="flex items-center gap-1.5 flex-1"
+              >
                 <Package className="w-3.5 h-3.5" />
                 Productos
-                <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4 ml-0.5">{rawProducts.length}</Badge>
+                <Badge
+                  variant="secondary"
+                  className="text-xs px-1.5 py-0 h-4 ml-0.5"
+                >
+                  {rawProducts.length}
+                </Badge>
               </TabsTrigger>
-              <TabsTrigger value="combos" className="flex items-center gap-1.5 flex-1">
+              <TabsTrigger
+                value="combos"
+                className="flex items-center gap-1.5 flex-1"
+              >
                 <Layers className="w-3.5 h-3.5" />
                 Combos
-                <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4 ml-0.5">{combos.length}</Badge>
+                <Badge
+                  variant="secondary"
+                  className="text-xs px-1.5 py-0 h-4 ml-0.5"
+                >
+                  {combos.length}
+                </Badge>
               </TabsTrigger>
             </TabsList>
 
             {/* ── Productos agrupados por type ── */}
-            <TabsContent value="products" className="flex-1 overflow-y-auto px-5 pb-5 mt-4 space-y-5">
+            <TabsContent
+              value="products"
+              className="flex-1 overflow-y-auto px-5 pb-5 mt-4 space-y-5"
+            >
               {sortedGroups.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                   <Package className="w-8 h-8 mb-2 opacity-30" />
@@ -278,9 +570,13 @@ function MenuDetailSheet({
                 sortedGroups.map(([groupName, items]) => (
                   <div key={groupName}>
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs font-semibold text-primary uppercase tracking-widest">{groupName}</span>
+                      <span className="text-xs font-semibold text-primary uppercase tracking-widest">
+                        {groupName}
+                      </span>
                       <div className="flex-1 h-px bg-border" />
-                      <span className="text-xs text-muted-foreground">{items.length}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {items.length}
+                      </span>
                     </div>
                     <div className="space-y-1.5">
                       {items.map((mp) => {
@@ -288,10 +584,19 @@ function MenuDetailSheet({
                         const thumb = getProductThumb(p);
                         const types = toArray(p.product_has_type);
                         return (
-                          <div key={mp.menu_product_id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border bg-card">
+                          <div
+                            key={mp.menu_product_id}
+                            className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border bg-card"
+                          >
                             <div className="w-9 h-9 rounded-md overflow-hidden bg-muted shrink-0 border border-border">
                               {thumb ? (
-                                <Image src={thumb} alt={p.name} width={36} height={36} className="w-full h-full object-cover" />
+                                <Image
+                                  src={thumb}
+                                  alt={p.name}
+                                  width={36}
+                                  height={36}
+                                  className="w-full h-full object-cover"
+                                />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
                                   <Package className="w-4 h-4 text-muted-foreground opacity-40" />
@@ -299,18 +604,25 @@ function MenuDetailSheet({
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{p.name}</p>
+                              <p className="text-sm font-medium truncate">
+                                {p.name}
+                              </p>
                               {types.length > 0 && (
                                 <div className="flex flex-wrap gap-1 mt-0.5">
                                   {types.map((t) => (
-                                    <span key={t.product_type_id} className="text-xs px-1.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                                    <span
+                                      key={t.product_type_id}
+                                      className="text-xs px-1.5 rounded-full bg-primary/10 text-primary border border-primary/20"
+                                    >
                                       {t.type}
                                     </span>
                                   ))}
                                 </div>
                               )}
                             </div>
-                            <span className="text-sm font-semibold shrink-0">{formatCOP(p.price)}</span>
+                            <span className="text-sm font-semibold shrink-0">
+                              {formatCOP(p.price)}
+                            </span>
                           </div>
                         );
                       })}
@@ -321,7 +633,10 @@ function MenuDetailSheet({
             </TabsContent>
 
             {/* ── Combos ── */}
-            <TabsContent value="combos" className="flex-1 overflow-y-auto px-5 pb-5 mt-4 space-y-3">
+            <TabsContent
+              value="combos"
+              className="flex-1 overflow-y-auto px-5 pb-5 mt-4 space-y-3"
+            >
               {combos.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                   <Layers className="w-8 h-8 mb-2 opacity-30" />
@@ -332,16 +647,30 @@ function MenuDetailSheet({
                   if (!combo) return null;
                   const comboProducts = toArray(combo.combo_has_product);
                   const thumbs = comboProducts
-                    .map((cp) => { const prod = toSingle(cp.product); return prod ? getProductThumb(prod) : null; })
+                    .map((cp) => {
+                      const prod = toSingle(cp.product);
+                      return prod ? getProductThumb(prod) : null;
+                    })
                     .filter(Boolean) as string[];
 
                   return (
-                    <div key={combo.combo_id} className="rounded-lg border border-border bg-card overflow-hidden">
+                    <div
+                      key={combo.combo_id}
+                      className="rounded-lg border border-border bg-card overflow-hidden"
+                    >
                       <div className="flex items-center gap-3 px-3 py-2.5">
                         <div className="w-9 h-9 rounded-md overflow-hidden bg-muted shrink-0 border border-border grid grid-cols-2 gap-px">
                           {thumbs.slice(0, 4).map((url, i) => (
-                            <div key={i} className="relative overflow-hidden bg-muted">
-                              <Image src={url} alt="" fill className="object-cover" />
+                            <div
+                              key={i}
+                              className="relative overflow-hidden bg-muted"
+                            >
+                              <Image
+                                src={url}
+                                alt=""
+                                fill
+                                className="object-cover"
+                              />
                             </div>
                           ))}
                           {thumbs.length === 0 && (
@@ -351,17 +680,27 @@ function MenuDetailSheet({
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{combo.name}</p>
-                          <p className="text-xs text-muted-foreground">{comboProducts.length} producto{comboProducts.length !== 1 ? "s" : ""}</p>
+                          <p className="text-sm font-medium truncate">
+                            {combo.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {comboProducts.length} producto
+                            {comboProducts.length !== 1 ? "s" : ""}
+                          </p>
                         </div>
-                        <span className="text-sm font-semibold shrink-0">{formatCOP(combo.price)}</span>
+                        <span className="text-sm font-semibold shrink-0">
+                          {formatCOP(combo.price)}
+                        </span>
                       </div>
                       {comboProducts.length > 0 && (
                         <div className="border-t border-border px-3 py-2 flex flex-wrap gap-1.5">
                           {comboProducts.map((cp) => {
                             const prod = toSingle(cp.product);
                             return prod ? (
-                              <span key={cp.combo_product_id} className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                              <span
+                                key={cp.combo_product_id}
+                                className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground"
+                              >
                                 {prod.name}
                               </span>
                             ) : null;
@@ -396,17 +735,29 @@ function MenusPanel({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [selectedMenuId, setSelectedMenuId] = useState("");
-  const [viewingMenu, setViewingMenu] = useState<{ id: number; name: string } | null>(null);
+  const [viewingMenu, setViewingMenu] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
 
-  const assignedIds = new Set(location.location_has_menu.map((lm) => lm.menu_id));
+  const assignedIds = new Set(
+    location.location_has_menu.map((lm) => lm.menu_id),
+  );
   const availableMenus = allMenus.filter((m) => !assignedIds.has(m.menu_id));
 
   function handleAssign() {
     if (!selectedMenuId) return;
     startTransition(async () => {
-      const result = await assignMenuToLocation(location.location_id, Number(selectedMenuId));
+      const result = await assignMenuToLocation(
+        location.location_id,
+        Number(selectedMenuId),
+      );
       if (result?.error) toast.error(result.error);
-      else { toast.success("Menú asignado"); setSelectedMenuId(""); router.refresh(); }
+      else {
+        toast.success("Menú asignado");
+        setSelectedMenuId("");
+        router.refresh();
+      }
     });
   }
 
@@ -414,7 +765,10 @@ function MenusPanel({
     startTransition(async () => {
       const result = await removeMenuFromLocation(locationMenuId);
       if (result?.error) toast.error(result.error);
-      else { toast.success(`"${menuName}" removido`); router.refresh(); }
+      else {
+        toast.success(`"${menuName}" removido`);
+        router.refresh();
+      }
     });
   }
 
@@ -427,23 +781,39 @@ function MenusPanel({
               <MapPin className="w-4 h-4 text-primary" />
               {location.name}
             </SheetTitle>
-            <p className="text-xs text-muted-foreground">Menús asignados a esta ubicación</p>
+            <p className="text-xs text-muted-foreground">
+              Menús asignados a esta ubicación
+            </p>
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto p-5 space-y-5">
             {availableMenus.length > 0 && (
               <div className="flex gap-2">
-                <Select value={selectedMenuId} onValueChange={setSelectedMenuId}>
+                <Select
+                  value={selectedMenuId}
+                  onValueChange={setSelectedMenuId}
+                >
                   <SelectTrigger className="flex-1 text-sm">
                     <SelectValue placeholder="Agregar menú..." />
                   </SelectTrigger>
                   <SelectContent>
                     {availableMenus.map((m) => (
-                      <SelectItem key={m.menu_id} value={String(m.menu_id)} className="text-sm">{m.name}</SelectItem>
+                      <SelectItem
+                        key={m.menu_id}
+                        value={String(m.menu_id)}
+                        className="text-sm"
+                      >
+                        {m.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Button size="sm" disabled={!selectedMenuId || isPending} onClick={handleAssign} className="gap-1.5 shrink-0">
+                <Button
+                  size="sm"
+                  disabled={!selectedMenuId || isPending}
+                  onClick={handleAssign}
+                  className="gap-1.5 shrink-0"
+                >
                   <Plus className="w-3.5 h-3.5" />
                   Asignar
                 </Button>
@@ -460,23 +830,37 @@ function MenusPanel({
                 {location.location_has_menu.map((lm) => {
                   const menu = toSingle(lm.menu);
                   return (
-                    <div key={lm.location_menu_id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border bg-card">
+                    <div
+                      key={lm.location_menu_id}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border bg-card"
+                    >
                       <div className="w-7 h-7 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
                         <BookOpen className="w-3.5 h-3.5 text-primary" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{menu?.name ?? "—"}</p>
-                        <p className="text-xs text-muted-foreground font-mono">#{lm.menu_id}</p>
+                        <p className="text-sm font-medium truncate">
+                          {menu?.name ?? "—"}
+                        </p>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          #{lm.menu_id}
+                        </p>
                       </div>
                       <button
-                        onClick={() => setViewingMenu({ id: lm.menu_id, name: menu?.name ?? "" })}
+                        onClick={() =>
+                          setViewingMenu({
+                            id: lm.menu_id,
+                            name: menu?.name ?? "",
+                          })
+                        }
                         className="text-muted-foreground hover:text-primary transition-colors p-1"
                         title="Ver contenido"
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => handleRemove(lm.location_menu_id, menu?.name ?? "")}
+                        onClick={() =>
+                          handleRemove(lm.location_menu_id, menu?.name ?? "")
+                        }
                         disabled={isPending}
                         className="text-muted-foreground hover:text-destructive transition-colors p-1 disabled:opacity-40"
                         title="Remover"
@@ -492,7 +876,9 @@ function MenusPanel({
 
           <div className="px-5 py-3 border-t border-border bg-muted/30">
             <p className="text-xs text-muted-foreground">
-              {location.location_has_menu.length} menú{location.location_has_menu.length !== 1 ? "s" : ""} asignado{location.location_has_menu.length !== 1 ? "s" : ""}
+              {location.location_has_menu.length} menú
+              {location.location_has_menu.length !== 1 ? "s" : ""} asignado
+              {location.location_has_menu.length !== 1 ? "s" : ""}
             </p>
           </div>
         </SheetContent>
@@ -523,13 +909,13 @@ export function LocationsView({
 }) {
   const [isPending, startTransition] = useTransition();
   const [createOpen, setCreateOpen] = useState(false);
-  const [editLoc, setEditLoc]       = useState<Location | null>(null);
-  const [deleteLoc, setDeleteLoc]   = useState<Location | null>(null);
+  const [editLoc, setEditLoc] = useState<Location | null>(null);
+  const [deleteLoc, setDeleteLoc] = useState<Location | null>(null);
   const [menusPanel, setMenusPanel] = useState<Location | null>(null);
 
   function submit(
     action: (fd: FormData) => Promise<{ error: string } | undefined>,
-    onSuccess: () => void
+    onSuccess: () => void,
   ) {
     const form = document.getElementById("location-form") as HTMLFormElement;
     if (!form) return;
@@ -545,7 +931,10 @@ export function LocationsView({
     startTransition(async () => {
       const result = await deleteLocation(deleteLoc.location_id);
       if (result?.error) toast.error(result.error);
-      else { toast.success("Ubicación eliminada"); setDeleteLoc(null); }
+      else {
+        toast.success("Ubicación eliminada");
+        setDeleteLoc(null);
+      }
     });
   }
 
@@ -553,15 +942,39 @@ export function LocationsView({
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold" style={{ fontFamily: "var(--font-space-grotesk)" }}>
+          <h1
+            className="text-2xl sm:text-3xl font-bold"
+            style={{ fontFamily: "var(--font-space-grotesk)" }}
+          >
             Ubicaciones
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">{locations.length} ubicaciones registradas</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {locations.length} ubicaciones registradas
+          </p>
         </div>
         <Button onClick={() => setCreateOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" /><span className="hidden sm:inline">Nueva ubicación</span>
+          <Plus className="w-4 h-4" />
+          <span className="hidden sm:inline">Nueva ubicación</span>
         </Button>
       </div>
+
+      {/* Mini mapa con las ubicaciones que tienen coordenadas */}
+      {locations.some((l) => l.latitude != null) && (
+        <div className="rounded-xl border border-border overflow-hidden h-64">
+          <LocationsMapClient
+            locations={locations
+              .filter((l) => l.latitude != null && l.longitude != null)
+              .map((l) => ({
+                id: l.location_id,
+                name: l.name,
+                address: [l.address, l.city].filter(Boolean).join(", "),
+                active: toSingle(l.food_truck) != null,
+                lat: l.latitude!,
+                lng: l.longitude!,
+              }))}
+          />
+        </div>
+      )}
 
       <div className="rounded-xl border border-border overflow-hidden">
         {locations.length === 0 ? (
@@ -574,7 +987,9 @@ export function LocationsView({
             <TableHeader>
               <TableRow>
                 <TableHead>Ubicación</TableHead>
-                <TableHead className="hidden md:table-cell">Dirección</TableHead>
+                <TableHead className="hidden md:table-cell">
+                  Dirección
+                </TableHead>
                 <TableHead>Food Truck</TableHead>
                 <TableHead>Menús</TableHead>
                 <TableHead className="w-10 text-center">QR</TableHead>
@@ -589,34 +1004,58 @@ export function LocationsView({
                   <TableRow key={loc.location_id}>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-                          <MapPin className="w-3.5 h-3.5 text-primary" />
+                        <div
+                          className={`relative w-7 h-7 rounded-md border flex items-center justify-center shrink-0 ${loc.latitude != null ? "bg-primary/10 border-primary/20" : "bg-muted border-border"}`}
+                        >
+                          <MapPin
+                            className={`w-3.5 h-3.5 ${loc.latitude != null ? "text-primary" : "text-muted-foreground/40"}`}
+                          />
+                          {loc.latitude != null && (
+                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full border border-background" />
+                          )}
                         </div>
                         <div>
                           <p className="font-medium text-sm">{loc.name}</p>
-                          {loc.city && (
-                            <p className="text-xs text-muted-foreground">{loc.city}{loc.country ? `, ${loc.country}` : ""}</p>
+                          {(loc.city || loc.country) && (
+                            <p className="text-xs text-muted-foreground">
+                              {[loc.city, loc.country]
+                                .filter(Boolean)
+                                .join(", ")}
+                            </p>
                           )}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-40 truncate">
-                      {loc.address ?? "—"}
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                      <p className="max-w-40 truncate">{loc.address ?? "—"}</p>
+                      {loc.latitude != null && loc.longitude != null && (
+                        <p className="text-xs font-mono text-muted-foreground/50 mt-0.5">
+                          {loc.latitude.toFixed(5)}, {loc.longitude.toFixed(5)}
+                        </p>
+                      )}
                     </TableCell>
                     <TableCell>
                       {truck ? (
                         <div className="flex items-center gap-1.5">
                           {truck.color && (
-                            <span className="w-2.5 h-2.5 rounded-full shrink-0 border border-border" style={{ backgroundColor: truck.color }} />
+                            <span
+                              className="w-2.5 h-2.5 rounded-full shrink-0 border border-border"
+                              style={{ backgroundColor: truck.color }}
+                            />
                           )}
-                          <span className="text-sm font-medium">{truck.name}</span>
+                          <span className="text-sm font-medium">
+                            {truck.name}
+                          </span>
                         </div>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
                     <TableCell>
-                      <button onClick={() => setMenusPanel(loc)} className="flex items-center gap-1 group">
+                      <button
+                        onClick={() => setMenusPanel(loc)}
+                        className="flex items-center gap-1 group"
+                      >
                         <Badge
                           variant={menuCount > 0 ? "secondary" : "outline"}
                           className="text-xs group-hover:bg-primary group-hover:text-primary-foreground transition-colors cursor-pointer"
@@ -627,18 +1066,30 @@ export function LocationsView({
                       </button>
                     </TableCell>
                     <TableCell className="text-center">
-                      <LocationQR locationId={loc.location_id} locationName={loc.name} />
+                      <LocationQR
+                        locationId={loc.location_id}
+                        locationName={loc.name}
+                      />
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditLoc(loc)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setEditLoc(loc)}
+                        >
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
                         <Button
-                          variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 hover:text-destructive"
                           onClick={() => setDeleteLoc(loc)}
                           disabled={menuCount > 0}
-                          title={menuCount > 0 ? "Tiene menús asignados" : "Eliminar"}
+                          title={
+                            menuCount > 0 ? "Tiene menús asignados" : "Eliminar"
+                          }
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
@@ -655,11 +1106,23 @@ export function LocationsView({
       {/* Create Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Nueva ubicación</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Nueva ubicación</DialogTitle>
+          </DialogHeader>
           <LocationForm trucks={trucks} />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-            <Button disabled={isPending} onClick={() => submit(createLocation, () => { toast.success("Ubicación creada"); setCreateOpen(false); })}>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={isPending}
+              onClick={() =>
+                submit(createLocation, () => {
+                  toast.success("Ubicación creada");
+                  setCreateOpen(false);
+                })
+              }
+            >
               {isPending ? "Guardando..." : "Crear"}
             </Button>
           </DialogFooter>
@@ -669,22 +1132,40 @@ export function LocationsView({
       {/* Edit Dialog */}
       <Dialog open={!!editLoc} onOpenChange={(o) => !o && setEditLoc(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Editar ubicación</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Editar ubicación</DialogTitle>
+          </DialogHeader>
           {editLoc && (
             <LocationForm
               trucks={trucks}
               defaultValues={{
-                name:          editLoc.name,
-                address:       editLoc.address  ?? "",
-                city:          editLoc.city      ?? "",
-                country:       editLoc.country   ?? "",
+                name: editLoc.name,
+                address: editLoc.address ?? "",
+                city: editLoc.city ?? "",
+                country: editLoc.country ?? "",
                 food_truck_id: String(editLoc.food_truck_id),
+                estatus: editLoc.estatus,
+                latitude: editLoc.latitude ?? undefined,
+                longitude: editLoc.longitude ?? undefined,
               }}
             />
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditLoc(null)}>Cancelar</Button>
-            <Button disabled={isPending} onClick={() => submit((fd) => updateLocation(editLoc!.location_id, fd), () => { toast.success("Ubicación actualizada"); setEditLoc(null); })}>
+            <Button variant="outline" onClick={() => setEditLoc(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={isPending}
+              onClick={() =>
+                submit(
+                  (fd) => updateLocation(editLoc!.location_id, fd),
+                  () => {
+                    toast.success("Ubicación actualizada");
+                    setEditLoc(null);
+                  },
+                )
+              }
+            >
               {isPending ? "Guardando..." : "Guardar"}
             </Button>
           </DialogFooter>
@@ -692,17 +1173,26 @@ export function LocationsView({
       </Dialog>
 
       {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteLoc} onOpenChange={(o) => !o && setDeleteLoc(null)}>
+      <AlertDialog
+        open={!!deleteLoc}
+        onOpenChange={(o) => !o && setDeleteLoc(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar ubicación?</AlertDialogTitle>
             <AlertDialogDescription>
-              Vas a eliminar <strong className="text-foreground">{deleteLoc?.name}</strong>. Esta acción no se puede deshacer.
+              Vas a eliminar{" "}
+              <strong className="text-foreground">{deleteLoc?.name}</strong>.
+              Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={isPending} className="bg-destructive text-white hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isPending}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
               {isPending ? "Eliminando..." : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>

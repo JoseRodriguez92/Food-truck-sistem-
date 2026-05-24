@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { LocationsView } from "@/components/admin/views/locations-view";
+import { LocationsView, type Location } from "@/components/admin/views/locations-view";
 
 export const metadata = { title: "Ubicaciones — Admin" };
 
@@ -10,7 +10,7 @@ export default async function LocationsPage() {
     supabase
       .from("location")
       .select(`
-        location_id, name, address, city, country,
+        location_id, name, address, city, country, estatus, latitude, longitude,
         food_truck_id,
         food_truck(food_truck_id, name, color),
         location_has_menu(
@@ -26,7 +26,7 @@ export default async function LocationsPage() {
 
   return (
     <LocationsView
-      locations={locations ?? []}
+      locations={(locations ?? []) as unknown as Location[]}
       trucks={trucks ?? []}
       menus={menus ?? []}
     />
