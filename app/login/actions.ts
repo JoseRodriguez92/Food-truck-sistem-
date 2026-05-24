@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
+export type LoginResult = { error: string } | { redirect: string } | undefined;
+
 function getRedirectByRole(roleName: string): string {
   const normalized = roleName.toLowerCase().trim();
   if (normalized === "admin" || normalized === "staff") return "/admin";
@@ -38,7 +40,7 @@ export async function login(formData: FormData) {
   const destination = getRedirectByRole(roleName);
 
   revalidatePath("/", "layout");
-  redirect(destination);
+  return { redirect: destination };
 }
 
 export async function logout() {

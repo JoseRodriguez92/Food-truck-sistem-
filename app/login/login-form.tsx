@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { useForm } from "react-hook-form";
@@ -21,6 +22,7 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -56,12 +58,15 @@ export function LoginForm() {
     formData.set("email", data.email);
     formData.set("password", data.password);
     const result = await login(formData);
-    if (result?.error) {
+    if (!result) return;
+    if ("error" in result) {
       setServerError(
         result.error === "Invalid login credentials"
           ? "Correo o contraseña incorrectos"
-          : result.error
+          : (result.error ?? "Error al iniciar sesión")
       );
+    } else if ("redirect" in result) {
+      router.push(result.redirect);
     }
   }
 
