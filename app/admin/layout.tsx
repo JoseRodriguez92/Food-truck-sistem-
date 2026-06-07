@@ -36,9 +36,9 @@ export default async function AdminLayout({
     .single();
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen overflow-hidden bg-background">
       <AdminSidebar profile={profile} />
-      <main className="flex-1 overflow-auto lg:ml-0 pt-14 lg:pt-0">
+      <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
         {children}
       </main>
     </div>

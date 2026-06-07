@@ -11,6 +11,9 @@ next.user-config.*
 .env*.local
 .env
 
+# MCP config (contiene tokens, no commitear)
+.mcp.json
+
 # Common ignores
 node_modules
 .next/
