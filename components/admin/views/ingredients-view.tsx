@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, Trash2, Leaf, FlaskConical } from "lucide-react";
+import { Plus, Pencil, Trash2, Leaf, FlaskConical, PackagePlus, History } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,8 @@ import {
   updateIngredient,
   deleteIngredient,
 } from "@/app/admin/ingredients/actions";
+import { StockAdjustDrawer } from "@/components/admin/stock-adjust-drawer";
+import { StockHistoryDrawer } from "@/components/admin/stock-history-drawer";
 
 export type Ingredient = {
   ingredient_id: number;
@@ -191,6 +193,8 @@ export function IngredientsView({
   const [createOpen, setCreateOpen] = useState(false);
   const [editItem, setEditItem] = useState<Ingredient | null>(null);
   const [deleteItem, setDeleteItem] = useState<Ingredient | null>(null);
+  const [adjustItem, setAdjustItem] = useState<Ingredient | null>(null);
+  const [historyItem, setHistoryItem] = useState<Ingredient | null>(null);
 
   const [createUnit, setCreateUnit] = useState("gr");
   const [editUnit, setEditUnit] = useState("gr");
@@ -324,6 +328,24 @@ export function IngredientsView({
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-8 w-8 hover:text-emerald-400"
+                        title="Ajustar stock"
+                        onClick={() => setAdjustItem(ing)}
+                      >
+                        <PackagePlus className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:text-primary"
+                        title="Historial de stock"
+                        onClick={() => setHistoryItem(ing)}
+                      >
+                        <History className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8"
                         onClick={() => {
                           setEditUnit(ing.unit);
@@ -400,6 +422,20 @@ export function IngredientsView({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Drawer Ajustar Stock */}
+      <StockAdjustDrawer
+        ingredient={adjustItem}
+        open={!!adjustItem}
+        onOpenChange={(o) => !o && setAdjustItem(null)}
+      />
+
+      {/* Drawer Historial */}
+      <StockHistoryDrawer
+        ingredient={historyItem}
+        open={!!historyItem}
+        onOpenChange={(o) => !o && setHistoryItem(null)}
+      />
 
       {/* AlertDialog Eliminar */}
       <AlertDialog
