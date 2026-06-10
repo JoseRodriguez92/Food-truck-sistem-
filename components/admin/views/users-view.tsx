@@ -4,18 +4,52 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, Trash2, Users, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, ChevronDown, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { createUser, updateUser, changeUserRole, deleteUser } from "@/app/admin/users/actions";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  createUser,
+  updateUser,
+  addUserRole,
+  removeUserRole,
+  deleteUser,
+} from "@/app/admin/users/actions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,66 +65,99 @@ export type UserProfile = {
   profile_has_role: {
     profile_role_id: string;
     role_id: string;
-    roles: { role_id: string; name: string } | { role_id: string; name: string }[] | null;
+    roles:
+      | { role_id: string; name: string }
+      | { role_id: string; name: string }[]
+      | null;
   }[];
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function toSingleRole(
-  roles: { role_id: string; name: string } | { role_id: string; name: string }[] | null
+  roles:
+    | { role_id: string; name: string }
+    | { role_id: string; name: string }[]
+    | null,
 ) {
   if (!roles) return null;
-  return Array.isArray(roles) ? roles[0] ?? null : roles;
+  return Array.isArray(roles) ? (roles[0] ?? null) : roles;
 }
 
-function getUserRole(user: UserProfile) {
-  const phr = user.profile_has_role?.[0];
-  if (!phr) return null;
-  return toSingleRole(phr.roles);
+function getUserRoles(
+  user: UserProfile,
+): Array<{ profile_role_id: string; role: { role_id: string; name: string } }> {
+  return user.profile_has_role
+    .map((phr) => {
+      const role = toSingleRole(phr.roles);
+      return {
+        profile_role_id: phr.profile_role_id,
+        role: role ?? { role_id: phr.role_id, name: "Sin nombre" },
+      };
+    })
+    .filter((r) => r.role);
 }
 
 function statusLabel(status: string | null) {
   switch (status) {
-    case "active":     return { label: "Activo",     variant: "default" as const };
-    case "inactive":   return { label: "Inactivo",   variant: "secondary" as const };
-    case "suspended":  return { label: "Suspendido", variant: "destructive" as const };
-    case "pending":    return { label: "Pendiente",  variant: "outline" as const };
-    default:           return { label: status ?? "—", variant: "outline" as const };
+    case "active":
+      return { label: "Activo", variant: "default" as const };
+    case "inactive":
+      return { label: "Inactivo", variant: "secondary" as const };
+    case "suspended":
+      return { label: "Suspendido", variant: "destructive" as const };
+    case "pending":
+      return { label: "Pendiente", variant: "outline" as const };
+    default:
+      return { label: status ?? "—", variant: "outline" as const };
   }
 }
 
 function initials(user: UserProfile) {
   const parts = [user.first_name, user.last_name].filter(Boolean);
-  if (parts.length) return parts.map((p) => p![0]).join("").toUpperCase().slice(0, 2);
+  if (parts.length)
+    return parts
+      .map((p) => p![0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
   return (user.email?.[0] ?? "?").toUpperCase();
 }
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
 const createSchema = z.object({
-  email:      z.string().email("Correo inválido"),
-  password:   z.string().min(6, "Mínimo 6 caracteres"),
+  email: z.string().email("Correo inválido"),
+  password: z.string().min(6, "Mínimo 6 caracteres"),
   first_name: z.string().min(1, "El nombre es requerido"),
-  last_name:  z.string().optional(),
-  role_id:    z.string().min(1, "Selecciona un rol"),
+  last_name: z.string().optional(),
+  role_id: z.string().min(1, "Selecciona un rol"),
 });
 
 const editSchema = z.object({
   first_name: z.string().min(1, "El nombre es requerido"),
-  last_name:  z.string().optional(),
-  status:     z.enum(["pending", "active", "inactive", "suspended"]),
+  last_name: z.string().optional(),
+  status: z.enum(["pending", "active", "inactive", "suspended"]),
 });
 
 type CreateValues = z.infer<typeof createSchema>;
-type EditValues   = z.infer<typeof editSchema>;
+type EditValues = z.infer<typeof editSchema>;
 
 // ─── Create Form ──────────────────────────────────────────────────────────────
 
 function CreateUserForm({ roles }: { roles: RoleOption[] }) {
-  const { register, formState: { errors } } = useForm<CreateValues>({
+  const {
+    register,
+    formState: { errors },
+  } = useForm<CreateValues>({
     resolver: zodResolver(createSchema),
-    defaultValues: { email: "", password: "", first_name: "", last_name: "", role_id: "" },
+    defaultValues: {
+      email: "",
+      password: "",
+      first_name: "",
+      last_name: "",
+      role_id: "",
+    },
   });
 
   return (
@@ -98,23 +165,51 @@ function CreateUserForm({ roles }: { roles: RoleOption[] }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="u-first">Nombre</Label>
-          <Input id="u-first" placeholder="Juan" aria-invalid={!!errors.first_name} {...register("first_name")} />
-          {errors.first_name && <p className="text-xs text-destructive">{errors.first_name.message}</p>}
+          <Input
+            id="u-first"
+            placeholder="Juan"
+            aria-invalid={!!errors.first_name}
+            {...register("first_name")}
+          />
+          {errors.first_name && (
+            <p className="text-xs text-destructive">
+              {errors.first_name.message}
+            </p>
+          )}
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="u-last">Apellido <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+          <Label htmlFor="u-last">
+            Apellido{" "}
+            <span className="text-muted-foreground text-xs">(opcional)</span>
+          </Label>
           <Input id="u-last" placeholder="García" {...register("last_name")} />
         </div>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="u-email">Correo</Label>
-        <Input id="u-email" type="email" placeholder="juan@ejemplo.com" aria-invalid={!!errors.email} {...register("email")} />
-        {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+        <Input
+          id="u-email"
+          type="email"
+          placeholder="juan@ejemplo.com"
+          aria-invalid={!!errors.email}
+          {...register("email")}
+        />
+        {errors.email && (
+          <p className="text-xs text-destructive">{errors.email.message}</p>
+        )}
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="u-pwd">Contraseña</Label>
-        <Input id="u-pwd" type="password" placeholder="Mínimo 6 caracteres" aria-invalid={!!errors.password} {...register("password")} />
-        {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
+        <Input
+          id="u-pwd"
+          type="password"
+          placeholder="Mínimo 6 caracteres"
+          aria-invalid={!!errors.password}
+          {...register("password")}
+        />
+        {errors.password && (
+          <p className="text-xs text-destructive">{errors.password.message}</p>
+        )}
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="u-role">Rol</Label>
@@ -125,10 +220,14 @@ function CreateUserForm({ roles }: { roles: RoleOption[] }) {
         >
           <option value="">Selecciona un rol...</option>
           {roles.map((r) => (
-            <option key={r.role_id} value={r.role_id}>{r.name}</option>
+            <option key={r.role_id} value={r.role_id}>
+              {r.name}
+            </option>
           ))}
         </select>
-        {errors.role_id && <p className="text-xs text-destructive">{errors.role_id.message}</p>}
+        {errors.role_id && (
+          <p className="text-xs text-destructive">{errors.role_id.message}</p>
+        )}
       </div>
     </form>
   );
@@ -137,7 +236,10 @@ function CreateUserForm({ roles }: { roles: RoleOption[] }) {
 // ─── Edit Form ────────────────────────────────────────────────────────────────
 
 function EditUserForm({ defaultValues }: { defaultValues: EditValues }) {
-  const { register, formState: { errors } } = useForm<EditValues>({
+  const {
+    register,
+    formState: { errors },
+  } = useForm<EditValues>({
     resolver: zodResolver(editSchema),
     defaultValues,
   });
@@ -147,11 +249,23 @@ function EditUserForm({ defaultValues }: { defaultValues: EditValues }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="u-first">Nombre</Label>
-          <Input id="u-first" placeholder="Juan" aria-invalid={!!errors.first_name} {...register("first_name")} />
-          {errors.first_name && <p className="text-xs text-destructive">{errors.first_name.message}</p>}
+          <Input
+            id="u-first"
+            placeholder="Juan"
+            aria-invalid={!!errors.first_name}
+            {...register("first_name")}
+          />
+          {errors.first_name && (
+            <p className="text-xs text-destructive">
+              {errors.first_name.message}
+            </p>
+          )}
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="u-last">Apellido <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+          <Label htmlFor="u-last">
+            Apellido{" "}
+            <span className="text-muted-foreground text-xs">(opcional)</span>
+          </Label>
           <Input id="u-last" placeholder="García" {...register("last_name")} />
         </div>
       </div>
@@ -167,60 +281,155 @@ function EditUserForm({ defaultValues }: { defaultValues: EditValues }) {
           <option value="pending">Pendiente</option>
           <option value="suspended">Suspendido</option>
         </select>
-        {errors.status && <p className="text-xs text-destructive">{errors.status.message}</p>}
+        {errors.status && (
+          <p className="text-xs text-destructive">{errors.status.message}</p>
+        )}
       </div>
     </form>
   );
 }
 
-// ─── Role Select (inline) ─────────────────────────────────────────────────────
+// ─── Multi Role Manager ───────────────────────────────────────────────────────
 
-function InlineRoleSelect({
+function MultiRoleManager({
   userId,
-  currentRoleId,
-  roles,
+  userRoles,
+  allRoles,
 }: {
   userId: string;
-  currentRoleId: string | undefined;
-  roles: RoleOption[];
+  userRoles: Array<{
+    profile_role_id: string;
+    role: { role_id: string; name: string };
+  }>;
+  allRoles: RoleOption[];
 }) {
   const [isPending, startTransition] = useTransition();
+  const [selectedRoleId, setSelectedRoleId] = useState("");
+  const [showSelect, setShowSelect] = useState(false);
 
-  function handleChange(roleId: string) {
+  const usedRoleIds = new Set(userRoles.map((ur) => ur.role.role_id));
+  const availableRoles = allRoles.filter((r) => !usedRoleIds.has(r.role_id));
+
+  function handleAdd() {
+    if (!selectedRoleId) return;
     startTransition(async () => {
-      const result = await changeUserRole(userId, roleId);
+      const result = await addUserRole(userId, selectedRoleId);
       if (result?.error) toast.error(result.error);
-      else toast.success("Rol actualizado");
+      else {
+        toast.success("Rol agregado");
+        setSelectedRoleId("");
+        setShowSelect(false);
+      }
+    });
+  }
+
+  function handleRemove(profileRoleId: string) {
+    startTransition(async () => {
+      const result = await removeUserRole(profileRoleId);
+      if (result?.error) toast.error(result.error);
+      else toast.success("Rol removido");
     });
   }
 
   return (
-    <Select value={currentRoleId ?? ""} onValueChange={handleChange} disabled={isPending}>
-      <SelectTrigger className="h-7 text-xs w-36 gap-1">
-        <SelectValue placeholder="Sin rol" />
-      </SelectTrigger>
-      <SelectContent>
-        {roles.map((r) => (
-          <SelectItem key={r.role_id} value={r.role_id} className="text-xs">
-            {r.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div className="flex flex-wrap items-center gap-1.5">
+      {userRoles.map((ur) => (
+        <Badge
+          key={ur.profile_role_id}
+          variant="default"
+          className="gap-1 pr-1 text-xs"
+        >
+          {ur.role.name}
+          <button
+            onClick={() => handleRemove(ur.profile_role_id)}
+            disabled={isPending}
+            className="hover:text-destructive transition-colors ml-0.5"
+            aria-label="Remover rol"
+          >
+            <X className="w-2.5 h-2.5" />
+          </button>
+        </Badge>
+      ))}
+
+      {userRoles.length === 0 && !showSelect && (
+        <span className="text-xs text-muted-foreground">Sin roles</span>
+      )}
+
+      {showSelect ? (
+        <div className="flex items-center gap-1">
+          <Select
+            value={selectedRoleId}
+            onValueChange={setSelectedRoleId}
+            disabled={isPending}
+          >
+            <SelectTrigger className="h-7 text-xs w-32">
+              <SelectValue placeholder="Rol..." />
+            </SelectTrigger>
+            <SelectContent>
+              {availableRoles.map((r) => (
+                <SelectItem
+                  key={r.role_id}
+                  value={r.role_id}
+                  className="text-xs"
+                >
+                  {r.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            disabled={!selectedRoleId || isPending}
+            onClick={handleAdd}
+          >
+            <Plus className="w-3 h-3" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={() => {
+              setShowSelect(false);
+              setSelectedRoleId("");
+            }}
+          >
+            <X className="w-3 h-3" />
+          </Button>
+        </div>
+      ) : availableRoles.length > 0 ? (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7"
+          onClick={() => setShowSelect(true)}
+          disabled={isPending}
+        >
+          <Plus className="w-3 h-3" />
+        </Button>
+      ) : null}
+    </div>
   );
 }
 
 // ─── Main View ────────────────────────────────────────────────────────────────
 
-export function UsersView({ users, roles }: { users: UserProfile[]; roles: RoleOption[] }) {
+export function UsersView({
+  users,
+  roles,
+}: {
+  users: UserProfile[];
+  roles: RoleOption[];
+}) {
   const [isPending, startTransition] = useTransition();
   const [createOpen, setCreateOpen] = useState(false);
-  const [editUser, setEditUser]     = useState<UserProfile | null>(null);
+  const [editUser, setEditUser] = useState<UserProfile | null>(null);
   const [deleteUser_, setDeleteUser] = useState<UserProfile | null>(null);
 
   function submit(
     action: (fd: FormData) => Promise<{ error: string } | undefined>,
-    onSuccess: () => void
+    onSuccess: () => void,
   ) {
     const form = document.getElementById("user-form") as HTMLFormElement;
     if (!form) return;
@@ -236,7 +445,10 @@ export function UsersView({ users, roles }: { users: UserProfile[]; roles: RoleO
     startTransition(async () => {
       const result = await deleteUser(deleteUser_.id);
       if (result?.error) toast.error(result.error);
-      else { toast.success("Usuario eliminado"); setDeleteUser(null); }
+      else {
+        toast.success("Usuario eliminado");
+        setDeleteUser(null);
+      }
     });
   }
 
@@ -245,13 +457,19 @@ export function UsersView({ users, roles }: { users: UserProfile[]; roles: RoleO
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold" style={{ fontFamily: "var(--font-space-grotesk)" }}>
+          <h1
+            className="text-2xl sm:text-6xl text-foreground"
+            style={{ fontFamily: "var(--font-space-grotesk)" }}
+          >
             Usuarios
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">{users.length} usuarios registrados</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {users.length} usuarios registrados
+          </p>
         </div>
         <Button onClick={() => setCreateOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" /><span className="hidden sm:inline">Nuevo usuario</span>
+          <Plus className="w-4 h-4" />
+          <span className="hidden sm:inline">Nuevo usuario</span>
         </Button>
       </div>
 
@@ -276,9 +494,13 @@ export function UsersView({ users, roles }: { users: UserProfile[]; roles: RoleO
             </TableHeader>
             <TableBody>
               {users.map((u) => {
-                const role = getUserRole(u);
-                const { label: statusText, variant: statusVariant } = statusLabel(u.status);
-                const displayName = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.email || "—";
+                const userRoles = getUserRoles(u);
+                const { label: statusText, variant: statusVariant } =
+                  statusLabel(u.status);
+                const displayName =
+                  [u.first_name, u.last_name].filter(Boolean).join(" ") ||
+                  u.email ||
+                  "—";
 
                 return (
                   <TableRow key={u.id}>
@@ -287,17 +509,19 @@ export function UsersView({ users, roles }: { users: UserProfile[]; roles: RoleO
                         <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 text-xs font-bold text-primary">
                           {initials(u)}
                         </div>
-                        <span className="font-medium text-sm">{displayName}</span>
+                        <span className="font-medium text-sm">
+                          {displayName}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                       {u.email ?? "—"}
                     </TableCell>
                     <TableCell>
-                      <InlineRoleSelect
+                      <MultiRoleManager
                         userId={u.id}
-                        currentRoleId={role?.role_id}
-                        roles={roles}
+                        userRoles={userRoles}
+                        allRoles={roles}
                       />
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
@@ -311,13 +535,16 @@ export function UsersView({ users, roles }: { users: UserProfile[]; roles: RoleO
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <Button
-                          variant="ghost" size="icon" className="h-8 w-8"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
                           onClick={() => setEditUser(u)}
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
                         <Button
-                          variant="ghost" size="icon"
+                          variant="ghost"
+                          size="icon"
                           className="h-8 w-8 hover:text-destructive"
                           onClick={() => setDeleteUser(u)}
                           title="Eliminar usuario"
@@ -337,13 +564,22 @@ export function UsersView({ users, roles }: { users: UserProfile[]; roles: RoleO
       {/* Create Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Nuevo usuario</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Nuevo usuario</DialogTitle>
+          </DialogHeader>
           <CreateUserForm roles={roles} />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancelar
+            </Button>
             <Button
               disabled={isPending}
-              onClick={() => submit(createUser, () => { toast.success("Usuario creado"); setCreateOpen(false); })}
+              onClick={() =>
+                submit(createUser, () => {
+                  toast.success("Usuario creado");
+                  setCreateOpen(false);
+                })
+              }
             >
               {isPending ? "Creando..." : "Crear"}
             </Button>
@@ -354,24 +590,31 @@ export function UsersView({ users, roles }: { users: UserProfile[]; roles: RoleO
       {/* Edit Dialog */}
       <Dialog open={!!editUser} onOpenChange={(o) => !o && setEditUser(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Editar usuario</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Editar usuario</DialogTitle>
+          </DialogHeader>
           {editUser && (
             <EditUserForm
               defaultValues={{
                 first_name: editUser.first_name ?? "",
-                last_name:  editUser.last_name  ?? "",
-                status:     (editUser.status as EditValues["status"]) ?? "active",
+                last_name: editUser.last_name ?? "",
+                status: (editUser.status as EditValues["status"]) ?? "active",
               }}
             />
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditUser(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setEditUser(null)}>
+              Cancelar
+            </Button>
             <Button
               disabled={isPending}
               onClick={() =>
                 submit(
                   (fd) => updateUser(editUser!.id, fd),
-                  () => { toast.success("Usuario actualizado"); setEditUser(null); }
+                  () => {
+                    toast.success("Usuario actualizado");
+                    setEditUser(null);
+                  },
                 )
               }
             >
@@ -382,16 +625,22 @@ export function UsersView({ users, roles }: { users: UserProfile[]; roles: RoleO
       </Dialog>
 
       {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteUser_} onOpenChange={(o) => !o && setDeleteUser(null)}>
+      <AlertDialog
+        open={!!deleteUser_}
+        onOpenChange={(o) => !o && setDeleteUser(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
             <AlertDialogDescription>
               Vas a eliminar a{" "}
               <strong className="text-foreground">
-                {[deleteUser_?.first_name, deleteUser_?.last_name].filter(Boolean).join(" ") || deleteUser_?.email}
+                {[deleteUser_?.first_name, deleteUser_?.last_name]
+                  .filter(Boolean)
+                  .join(" ") || deleteUser_?.email}
               </strong>
-              . Esta acción eliminará su cuenta permanentemente y no se puede deshacer.
+              . Esta acción eliminará su cuenta permanentemente y no se puede
+              deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

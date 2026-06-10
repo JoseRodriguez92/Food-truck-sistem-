@@ -694,7 +694,7 @@ export function ProductsView({ products, allIngredients, allCategories }: { prod
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold" style={{ fontFamily: "var(--font-space-grotesk)" }}>Productos</h1>
+          <h1 className="text-2xl sm:text-6xl text-foreground" style={{ fontFamily: "var(--font-space-grotesk)" }}>Productos</h1>
           <p className="text-sm text-muted-foreground mt-1">{products.length} productos registrados</p>
         </div>
         <div className="flex items-center gap-2">

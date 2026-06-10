@@ -92,7 +92,7 @@ export function CategoriesView({ categories }: { categories: Category[] }) {
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold" style={{ fontFamily: "var(--font-space-grotesk)" }}>
+          <h1 className="text-2xl sm:text-6xl text-foreground" style={{ fontFamily: "var(--font-space-grotesk)" }}>
             Categorías
           </h1>
           <p className="text-sm text-muted-foreground mt-1">

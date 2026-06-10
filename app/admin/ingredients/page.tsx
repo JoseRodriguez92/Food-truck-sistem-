@@ -1,15 +1,24 @@
 import { createClient } from "@/lib/supabase/server";
-import { IngredientsView, type Ingredient } from "@/components/admin/views/ingredients-view";
+import { IngredientsView } from "@/components/admin/views/ingredients-view";
 
 export const metadata = { title: "Ingredientes — Admin" };
 
 export default async function IngredientsPage() {
   const supabase = await createClient();
 
-  const { data: ingredients } = await supabase
-    .from("ingredient")
-    .select("ingredient_id, name, unit, stock, description, created_at")
+  // Fetch food trucks
+  const { data: trucks } = await supabase
+    .from("food_truck")
+    .select("food_truck_id, name")
     .order("name");
 
-  return <IngredientsView ingredients={(ingredients ?? []) as Ingredient[]} />;
+  // Fetch ingredientes
+  const { data: ingredients } = await supabase
+    .from("ingredient")
+    .select("ingredient_id, name, unit, description, created_at")
+    .order("name");
+
+  return (
+    <IngredientsView ingredients={ingredients ?? []} trucks={trucks ?? []} />
+  );
 }

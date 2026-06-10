@@ -20,6 +20,7 @@ import {
   Leaf,
   Tag,
   ClipboardList,
+  Receipt,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -37,6 +38,7 @@ const topLinks = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/orders", label: "Pedidos", icon: ShoppingBag, exact: false },
   { href: "/admin/tareas", label: "Tareas", icon: ClipboardList, exact: false },
+  { href: "/admin/expenses", label: "Gastos", icon: Receipt, exact: false },
 ];
 
 // Sub-items del acordeón Food Trucks
@@ -98,7 +100,13 @@ function NavItems({
         </Link>
       ))}
 
-      <div className="mx-3 my-1 h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(232,197,71,0.4) 40%, rgba(232,197,71,0.4) 60%, transparent)" }} />
+      <div
+        className="mx-3 my-1 h-px"
+        style={{
+          background:
+            "linear-gradient(90deg, transparent, rgba(232,197,71,0.4) 40%, rgba(232,197,71,0.4) 60%, transparent)",
+        }}
+      />
 
       {/* Acordeón Food Trucks */}
       <div>
@@ -143,7 +151,13 @@ function NavItems({
         )}
       </div>
 
-      <div className="mx-3 my-1 h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(232,197,71,0.4) 40%, rgba(232,197,71,0.4) 60%, transparent)" }} />
+      <div
+        className="mx-3 my-1 h-px"
+        style={{
+          background:
+            "linear-gradient(90deg, transparent, rgba(232,197,71,0.4) 40%, rgba(232,197,71,0.4) 60%, transparent)",
+        }}
+      />
 
       {/* Acordeón Catálogo */}
       <div>
@@ -188,7 +202,13 @@ function NavItems({
         )}
       </div>
 
-      <div className="mx-3 my-1 h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(232,197,71,0.4) 40%, rgba(232,197,71,0.4) 60%, transparent)" }} />
+      <div
+        className="mx-3 my-1 h-px"
+        style={{
+          background:
+            "linear-gradient(90deg, transparent, rgba(232,197,71,0.4) 40%, rgba(232,197,71,0.4) 60%, transparent)",
+        }}
+      />
 
       {/* Acordeón Usuarios */}
       <div>
@@ -245,16 +265,26 @@ export function AdminSidebar({ profile }: { profile: Profile | null }) {
   return (
     <>
       {/* Sidebar desktop */}
-      <aside className="hidden lg:flex flex-col w-60 h-full shrink-0 border-r border-border" style={{ background: "radial-gradient(ellipse at top left, rgba(232,197,71,0.06) 0%, transparent 55%), linear-gradient(180deg, #000000 0%, #0a0a08 35%, #111110 70%, #181815 100%)" }}>
+      <aside
+        className="hidden lg:flex flex-col w-60 h-full shrink-0 border-r border-border"
+        style={{
+          background:
+            "radial-gradient(ellipse at top left, rgba(232,197,71,0.06) 0%, transparent 55%), linear-gradient(180deg, #000000 0%, #0a0a08 35%, #111110 70%, #181815 100%)",
+        }}
+      >
         {/* Franja dorada superior */}
-        <div className="h-px w-full" style={{ background: "linear-gradient(90deg, transparent, #E8C547 40%, #E8C547 60%, transparent)" }} />
-        <div className="flex items-center px-5 py-5 border-b border-white/6">
-          <Image
+        <div
+          className="h-px w-full"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, #E8C547 40%, #E8C547 60%, transparent)",
+          }}
+        />
+        <div className="flex items-center justify-center px-5 py-5 border-b border-white/6 ">
+          <img
             src="/LogoTipo-3StreetFood.svg"
             alt="3 Street Food"
-            width={180}
-            height={40}
-            className="h-8 w-auto"
+            className="h-15 w-auto margin-x-auto"
           />
         </div>
         <div className="flex-1 p-3 overflow-y-auto">
@@ -280,7 +310,14 @@ export function AdminSidebar({ profile }: { profile: Profile | null }) {
               {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-64 p-0 flex flex-col" style={{ background: "radial-gradient(ellipse at top left, rgba(232,197,71,0.06) 0%, transparent 55%), linear-gradient(180deg, #000000 0%, #0a0a08 35%, #111110 70%, #181815 100%)" }}>
+          <SheetContent
+            side="left"
+            className="w-64 p-0 flex flex-col"
+            style={{
+              background:
+                "radial-gradient(ellipse at top left, rgba(232,197,71,0.06) 0%, transparent 55%), linear-gradient(180deg, #000000 0%, #0a0a08 35%, #111110 70%, #181815 100%)",
+            }}
+          >
             <div className="flex items-center px-5 py-5 border-b border-border">
               <Image
                 src="/LogoTipo-3StreetFood.svg"

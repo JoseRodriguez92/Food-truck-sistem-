@@ -1,10 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -38,10 +33,14 @@ function toSingle<T>(val: T | T[] | null | undefined): T | null {
 // Colores por código de estado
 function getStatusStyle(code: string) {
   const c = code.toLowerCase();
-  if (c.includes("pend")) return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
-  if (c.includes("prep") || c.includes("progress")) return "bg-blue-500/10 text-blue-600 border-blue-500/20";
-  if (c.includes("ready") || c.includes("listo")) return "bg-green-500/10 text-green-600 border-green-500/20";
-  if (c.includes("cancel")) return "bg-red-500/10 text-red-600 border-red-500/20";
+  if (c.includes("pend"))
+    return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
+  if (c.includes("prep") || c.includes("progress"))
+    return "bg-blue-500/10 text-blue-600 border-blue-500/20";
+  if (c.includes("ready") || c.includes("listo"))
+    return "bg-green-500/10 text-green-600 border-green-500/20";
+  if (c.includes("cancel"))
+    return "bg-red-500/10 text-red-600 border-red-500/20";
   return "bg-muted text-muted-foreground border-border";
 }
 
@@ -80,7 +79,7 @@ export default async function AdminDashboard() {
       status_order_id,
       profiles(first_name, last_name, email),
       status_order(status_order_id, name, code, sort_order)
-    `
+    `,
     )
     .gte("created_at", todayStart.toISOString())
     .order("created_at", { ascending: false });
@@ -95,24 +94,48 @@ export default async function AdminDashboard() {
   const total = orders?.length ?? 0;
   const pending =
     orders?.filter((o) =>
-      toSingle(o.status_order as unknown as StatusJoin | StatusJoin[])?.code?.toLowerCase().includes("pend")
+      toSingle(o.status_order as unknown as StatusJoin | StatusJoin[])
+        ?.code?.toLowerCase()
+        .includes("pend"),
     ).length ?? 0;
   const preparing =
     orders?.filter((o) =>
-      toSingle(o.status_order as unknown as StatusJoin | StatusJoin[])?.code?.toLowerCase().includes("prep")
+      toSingle(o.status_order as unknown as StatusJoin | StatusJoin[])
+        ?.code?.toLowerCase()
+        .includes("prep"),
     ).length ?? 0;
   const ready =
     orders?.filter((o) =>
-      toSingle(o.status_order as unknown as StatusJoin | StatusJoin[])?.code
-        ?.toLowerCase()
-        .match(/ready|listo/)
+      toSingle(o.status_order as unknown as StatusJoin | StatusJoin[])
+        ?.code?.toLowerCase()
+        .match(/ready|listo/),
     ).length ?? 0;
 
   const stats = [
-    { label: "Pedidos hoy", value: total, icon: ShoppingBag, color: "text-primary" },
-    { label: "Pendientes", value: pending, icon: Clock, color: "text-yellow-500" },
-    { label: "Preparando", value: preparing, icon: Loader, color: "text-blue-500" },
-    { label: "Listos", value: ready, icon: CheckCircle, color: "text-green-500" },
+    {
+      label: "Pedidos hoy",
+      value: total,
+      icon: ShoppingBag,
+      color: "text-primary",
+    },
+    {
+      label: "Pendientes",
+      value: pending,
+      icon: Clock,
+      color: "text-yellow-500",
+    },
+    {
+      label: "Preparando",
+      value: preparing,
+      icon: Loader,
+      color: "text-blue-500",
+    },
+    {
+      label: "Listos",
+      value: ready,
+      icon: CheckCircle,
+      color: "text-green-500",
+    },
   ];
 
   return (
@@ -120,7 +143,7 @@ export default async function AdminDashboard() {
       {/* Header */}
       <div>
         <h1
-          className="text-2xl sm:text-3xl font-bold text-foreground"
+          className="text-2xl sm:text-6xl text-foreground"
           style={{ fontFamily: "var(--font-space-grotesk)" }}
         >
           Dashboard
@@ -173,7 +196,9 @@ export default async function AdminDashboard() {
                     <TableHead className="w-16"># Pedido</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead className="hidden sm:table-cell">Hora</TableHead>
-                    <TableHead className="hidden md:table-cell">Notas</TableHead>
+                    <TableHead className="hidden md:table-cell">
+                      Notas
+                    </TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead>Estado</TableHead>
                   </TableRow>
@@ -181,14 +206,16 @@ export default async function AdminDashboard() {
                 <TableBody>
                   {orders.map((order) => {
                     const profile = toSingle(
-                      order.profiles as unknown as ProfileJoin | ProfileJoin[]
+                      order.profiles as unknown as ProfileJoin | ProfileJoin[],
                     );
                     const status = toSingle(
-                      order.status_order as unknown as StatusJoin | StatusJoin[]
+                      order.status_order as unknown as
+                        | StatusJoin
+                        | StatusJoin[],
                     );
                     const customerName = profile?.first_name
                       ? `${profile.first_name} ${profile.last_name ?? ""}`.trim()
-                      : profile?.email ?? "—";
+                      : (profile?.email ?? "—");
 
                     return (
                       <TableRow key={order.profile_order_id}>
@@ -221,7 +248,9 @@ export default async function AdminDashboard() {
                               {status.name}
                             </Badge>
                           ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
                           )}
                           <div className="mt-1.5">
                             <OrderStatusSelect

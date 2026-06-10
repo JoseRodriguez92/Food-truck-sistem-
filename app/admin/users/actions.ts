@@ -96,20 +96,34 @@ export async function updateUser(userId: string, formData: FormData) {
   revalidatePath("/admin/users");
 }
 
-export async function changeUserRole(userId: string, roleId: string) {
+export async function addUserRole(userId: string, roleId: string) {
   const supabase = await createServerClient();
 
-  // Reemplaza el rol actual (upsert por profile_id)
-  const { error: delError } = await supabase
+  // Verifica si ya tiene ese rol
+  const { data: existing } = await supabase
     .from("profile_has_role")
-    .delete()
-    .eq("profile_id", userId);
+    .select("profile_role_id")
+    .eq("profile_id", userId)
+    .eq("role_id", roleId)
+    .single();
 
-  if (delError) return { error: delError.message };
+  if (existing) return { error: "El usuario ya tiene ese rol" };
 
   const { error } = await supabase
     .from("profile_has_role")
     .insert({ profile_id: userId, role_id: roleId });
+
+  if (error) return { error: error.message };
+  revalidatePath("/admin/users");
+}
+
+export async function removeUserRole(profileRoleId: string) {
+  const supabase = await createServerClient();
+
+  const { error } = await supabase
+    .from("profile_has_role")
+    .delete()
+    .eq("profile_role_id", profileRoleId);
 
   if (error) return { error: error.message };
   revalidatePath("/admin/users");

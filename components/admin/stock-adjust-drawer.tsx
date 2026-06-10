@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ArrowDownCircle, ArrowUpCircle, SlidersHorizontal } from "lucide-react";
+import {
+  ArrowDownCircle,
+  ArrowUpCircle,
+  SlidersHorizontal,
+} from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -14,26 +18,54 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { adjustStock, type MovementType } from "@/app/admin/ingredients/actions";
-import type { Ingredient } from "@/components/admin/views/ingredients-view";
+import {
+  adjustStock,
+  type MovementType,
+} from "@/app/admin/ingredients/actions";
+import type { IngredientWithStock } from "@/components/admin/views/ingredients-view";
 
-const TYPES: { value: MovementType; label: string; icon: React.ElementType; color: string }[] = [
-  { value: "entrada",  label: "Entrada",  icon: ArrowUpCircle,   color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/40 data-[active=true]:bg-emerald-500/25 data-[active=true]:border-emerald-400" },
-  { value: "salida",   label: "Salida",   icon: ArrowDownCircle, color: "bg-red-500/15 text-red-400 border-red-500/40 data-[active=true]:bg-red-500/25 data-[active=true]:border-red-400" },
-  { value: "ajuste",   label: "Ajuste",   icon: SlidersHorizontal, color: "bg-amber-500/15 text-amber-400 border-amber-500/40 data-[active=true]:bg-amber-500/25 data-[active=true]:border-amber-400" },
+const TYPES: {
+  value: MovementType;
+  label: string;
+  icon: React.ElementType;
+  color: string;
+}[] = [
+  {
+    value: "entrada",
+    label: "Entrada",
+    icon: ArrowUpCircle,
+    color:
+      "bg-emerald-500/15 text-emerald-400 border-emerald-500/40 data-[active=true]:bg-emerald-500/25 data-[active=true]:border-emerald-400",
+  },
+  {
+    value: "salida",
+    label: "Salida",
+    icon: ArrowDownCircle,
+    color:
+      "bg-red-500/15 text-red-400 border-red-500/40 data-[active=true]:bg-red-500/25 data-[active=true]:border-red-400",
+  },
+  {
+    value: "ajuste",
+    label: "Ajuste",
+    icon: SlidersHorizontal,
+    color:
+      "bg-amber-500/15 text-amber-400 border-amber-500/40 data-[active=true]:bg-amber-500/25 data-[active=true]:border-amber-400",
+  },
 ];
 
 export function StockAdjustDrawer({
   ingredient,
+  foodtruckId,
   open,
   onOpenChange,
 }: {
-  ingredient: Ingredient | null;
+  ingredient: IngredientWithStock | null;
+  foodtruckId: number | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
   const [isPending, startTransition] = useTransition();
-  const [type, setType]   = useState<MovementType>("entrada");
+  const [type, setType] = useState<MovementType>("entrada");
   const [value, setValue] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -45,18 +77,34 @@ export function StockAdjustDrawer({
   const preview = (() => {
     if (!value || numVal <= 0) return null;
     if (type === "entrada") return currentStock + numVal;
-    if (type === "salida")  return currentStock - numVal;
+    if (type === "salida") return currentStock - numVal;
     return numVal; // ajuste: es el nuevo total
   })();
 
   const isInvalid = type === "salida" && preview !== null && preview < 0;
 
   function handleSubmit() {
-    if (!value || numVal <= 0) { toast.error("Ingresa una cantidad válida"); return; }
-    if (isInvalid) { toast.error("Stock insuficiente para esta salida"); return; }
+    if (!value || numVal <= 0) {
+      toast.error("Ingresa una cantidad válida");
+      return;
+    }
+    if (isInvalid) {
+      toast.error("Stock insuficiente para esta salida");
+      return;
+    }
+    if (!foodtruckId) {
+      toast.error("Selecciona un food truck");
+      return;
+    }
 
     startTransition(async () => {
-      const result = await adjustStock(ingredient!.ingredient_id, type, numVal, notes);
+      const result = await adjustStock(
+        foodtruckId,
+        ingredient!.ingredient_id,
+        type,
+        numVal,
+        notes,
+      );
       if (result?.error) {
         toast.error(result.error);
       } else {
@@ -82,7 +130,10 @@ export function StockAdjustDrawer({
           <div className="rounded-xl bg-muted/20 border border-border/60 px-4 py-3 flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Stock actual</span>
             <span className="font-mono font-semibold text-sm">
-              {currentStock} <span className="text-muted-foreground font-normal">{ingredient.unit}</span>
+              {currentStock}{" "}
+              <span className="text-muted-foreground font-normal">
+                {ingredient.unit}
+              </span>
             </span>
           </div>
 
@@ -122,15 +173,21 @@ export function StockAdjustDrawer({
                 step="0.01"
                 placeholder="0"
                 value={value}
-                onChange={e => setValue(e.target.value)}
-                className={cn("pr-10", isInvalid && "border-destructive focus-visible:ring-destructive")}
+                onChange={(e) => setValue(e.target.value)}
+                className={cn(
+                  "pr-10",
+                  isInvalid &&
+                    "border-destructive focus-visible:ring-destructive",
+                )}
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                 {ingredient.unit}
               </span>
             </div>
             {isInvalid && (
-              <p className="text-xs text-destructive">Stock insuficiente (quedaría negativo)</p>
+              <p className="text-xs text-destructive">
+                Stock insuficiente (quedaría negativo)
+              </p>
             )}
           </div>
 
@@ -141,8 +198,12 @@ export function StockAdjustDrawer({
               <div className="flex items-center gap-2 font-mono text-sm">
                 <span className="text-muted-foreground">{currentStock}</span>
                 <span className="text-muted-foreground">→</span>
-                <span className="font-semibold text-primary">{preview.toFixed(2)}</span>
-                <span className="text-muted-foreground text-xs">{ingredient.unit}</span>
+                <span className="font-semibold text-primary">
+                  {preview.toFixed(2)}
+                </span>
+                <span className="text-muted-foreground text-xs">
+                  {ingredient.unit}
+                </span>
               </div>
             </div>
           )}
@@ -150,14 +211,17 @@ export function StockAdjustDrawer({
           {/* Notas */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="adj-notes">
-              Nota <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
+              Nota{" "}
+              <span className="text-muted-foreground text-xs font-normal">
+                (opcional)
+              </span>
             </Label>
             <Textarea
               id="adj-notes"
               placeholder="Ej: Compra en Makro, merma por mal estado..."
               rows={2}
               value={notes}
-              onChange={e => setNotes(e.target.value)}
+              onChange={(e) => setNotes(e.target.value)}
             />
           </div>
         </div>

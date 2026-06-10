@@ -1,10 +1,20 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, Trash2, Leaf, FlaskConical, PackagePlus, History } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Leaf,
+  FlaskConical,
+  PackagePlus,
+  History,
+  Truck,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -57,9 +67,17 @@ export type Ingredient = {
   ingredient_id: number;
   name: string;
   unit: string;
-  stock: number;
   description: string | null;
   created_at: string;
+};
+
+export type FoodTruck = {
+  food_truck_id: number;
+  name: string;
+};
+
+export type IngredientWithStock = Ingredient & {
+  stock: number;
 };
 
 const UNITS = [
@@ -73,7 +91,6 @@ const UNITS = [
 const schema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
   unit: z.string().min(1, "La unidad es requerida"),
-  stock: z.coerce.number().min(0, "El stock no puede ser negativo"),
   description: z.string().optional(),
 });
 type FormValues = z.infer<typeof schema>;
@@ -97,7 +114,6 @@ function IngredientForm({
     defaultValues: defaultValues ?? {
       name: "",
       unit: "gr",
-      stock: 0,
       description: "",
     },
   });
@@ -117,39 +133,21 @@ function IngredientForm({
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label>Unidad</Label>
-          <Select value={unitValue} onValueChange={onUnitChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona unidad" />
-            </SelectTrigger>
-            <SelectContent>
-              {UNITS.map((u) => (
-                <SelectItem key={u.value} value={u.value}>
-                  {u.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <input type="hidden" name="unit" value={unitValue} />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="ing-stock">Stock inicial</Label>
-          <Input
-            id="ing-stock"
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="0"
-            aria-invalid={!!errors.stock}
-            {...register("stock")}
-          />
-          {errors.stock && (
-            <p className="text-xs text-destructive">{errors.stock.message}</p>
-          )}
-        </div>
+      <div className="space-y-1.5">
+        <Label>Unidad</Label>
+        <Select value={unitValue} onValueChange={onUnitChange}>
+          <SelectTrigger>
+            <SelectValue placeholder="Selecciona unidad" />
+          </SelectTrigger>
+          <SelectContent>
+            {UNITS.map((u) => (
+              <SelectItem key={u.value} value={u.value}>
+                {u.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <input type="hidden" name="unit" value={unitValue} />
       </div>
 
       <div className="space-y-1.5">
@@ -186,18 +184,58 @@ function stockBadge(stock: number, unit: string) {
 
 export function IngredientsView({
   ingredients,
+  trucks,
 }: {
   ingredients: Ingredient[];
+  trucks: FoodTruck[];
 }) {
   const [isPending, startTransition] = useTransition();
   const [createOpen, setCreateOpen] = useState(false);
-  const [editItem, setEditItem] = useState<Ingredient | null>(null);
-  const [deleteItem, setDeleteItem] = useState<Ingredient | null>(null);
-  const [adjustItem, setAdjustItem] = useState<Ingredient | null>(null);
-  const [historyItem, setHistoryItem] = useState<Ingredient | null>(null);
+  const [editItem, setEditItem] = useState<IngredientWithStock | null>(null);
+  const [deleteItem, setDeleteItem] = useState<IngredientWithStock | null>(
+    null,
+  );
+  const [adjustItem, setAdjustItem] = useState<IngredientWithStock | null>(
+    null,
+  );
+  const [historyItem, setHistoryItem] = useState<IngredientWithStock | null>(
+    null,
+  );
 
+  const [selectedTruck, setSelectedTruck] = useState<number | null>(
+    trucks[0]?.food_truck_id ?? null,
+  );
+  const [ingredientsWithStock, setIngredientsWithStock] = useState<
+    IngredientWithStock[]
+  >([]);
   const [createUnit, setCreateUnit] = useState("gr");
   const [editUnit, setEditUnit] = useState("gr");
+
+  // Fetch stock para truck seleccionado
+  useEffect(() => {
+    if (!selectedTruck) return;
+
+    const fetchStock = async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("foodtruck_has_ingredient")
+        .select("ingredient_id, stock")
+        .eq("foodtruck_id", selectedTruck);
+
+      const stockMap = new Map(
+        data?.map((d) => [d.ingredient_id, d.stock]) ?? [],
+      );
+
+      const withStock = ingredients.map((ing) => ({
+        ...ing,
+        stock: stockMap.get(ing.ingredient_id) ?? 0,
+      }));
+
+      setIngredientsWithStock(withStock);
+    };
+
+    fetchStock();
+  }, [selectedTruck, ingredients]);
 
   function handleCreate() {
     const form = document.getElementById("ingredient-form") as HTMLFormElement;
@@ -245,35 +283,58 @@ export function IngredientsView({
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1
-            className="text-2xl sm:text-3xl font-bold"
+            className="text-2xl sm:text-6xl text-foreground"
             style={{ fontFamily: "var(--font-space-grotesk)" }}
           >
             Ingredientes
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {ingredients.length} ingrediente
-            {ingredients.length !== 1 ? "s" : ""} registrado
-            {ingredients.length !== 1 ? "s" : ""}
+            {ingredientsWithStock.length} ingrediente
+            {ingredientsWithStock.length !== 1 ? "s" : ""} registrado
+            {ingredientsWithStock.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setCreateUnit("gr");
-            setCreateOpen(true);
-          }}
-          className="gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Agregar</span>
-        </Button>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2 bg-transparent shadow-lg shadow-primary/30 ring-2 ring-primary/20 border border-primary/30 rounded-lg px-3 py-2 cursor-pointer">
+            <Truck className="w-6 h-6 text-foreground" />
+            <Select
+              value={selectedTruck?.toString() ?? ""}
+              onValueChange={(v) => setSelectedTruck(Number(v))}
+            >
+              <SelectTrigger className="w-full sm:w-50 !border-none !shadow-none !bg-transparent hover:!bg-transparent focus:!bg-transparent active:!bg-transparent focus:!ring-0 focus:!ring-offset-0 focus-visible:!ring-0 focus-visible:!ring-offset-0 data-[state=open]:!bg-transparent !h-auto !p-0 !outline-none">
+                <SelectValue placeholder="Selecciona truck" />
+              </SelectTrigger>
+              <SelectContent>
+                {trucks.map((truck) => (
+                  <SelectItem
+                    key={truck.food_truck_id}
+                    value={truck.food_truck_id.toString()}
+                  >
+                    {truck.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            onClick={() => {
+              setCreateUnit("gr");
+              setCreateOpen(true);
+            }}
+            className="gap-2 shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Agregar</span>
+          </Button>
+        </div>
       </div>
 
       {/* Tabla */}
       <div className="rounded-xl border border-border overflow-hidden">
-        {ingredients.length === 0 ? (
+        {ingredientsWithStock.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
             <Leaf className="w-10 h-10 opacity-20" />
             <p className="text-sm">Sin ingredientes registrados</p>
@@ -301,7 +362,7 @@ export function IngredientsView({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {ingredients.map((ing) => (
+              {ingredientsWithStock.map((ing) => (
                 <TableRow key={ing.ingredient_id}>
                   <TableCell className="text-muted-foreground font-mono text-sm">
                     {ing.ingredient_id}
@@ -407,7 +468,6 @@ export function IngredientsView({
               defaultValues={{
                 name: editItem.name,
                 unit: editItem.unit,
-                stock: editItem.stock,
                 description: editItem.description ?? "",
               }}
             />
@@ -426,6 +486,7 @@ export function IngredientsView({
       {/* Drawer Ajustar Stock */}
       <StockAdjustDrawer
         ingredient={adjustItem}
+        foodtruckId={selectedTruck}
         open={!!adjustItem}
         onOpenChange={(o) => !o && setAdjustItem(null)}
       />
@@ -433,6 +494,7 @@ export function IngredientsView({
       {/* Drawer Historial */}
       <StockHistoryDrawer
         ingredient={historyItem}
+        foodtruckId={selectedTruck}
         open={!!historyItem}
         onOpenChange={(o) => !o && setHistoryItem(null)}
       />

@@ -186,7 +186,7 @@ export function FoodTrucksView({ trucks }: { trucks: FoodTruck[] }) {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1
-            className="text-2xl sm:text-3xl font-bold text-foreground"
+            className="text-2xl sm:text-6xl text-foreground"
             style={{ fontFamily: "var(--font-space-grotesk)" }}
           >
             Food Trucks

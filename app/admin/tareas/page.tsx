@@ -23,7 +23,7 @@ export default async function TareasPage() {
             <ClipboardList className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-space-grotesk)" }}>
+            <h1 className="text-2xl sm:text-6xl text-foreground" style={{ fontFamily: "var(--font-space-grotesk)" }}>
               Tareas
             </h1>
             <p className="text-sm text-muted-foreground">

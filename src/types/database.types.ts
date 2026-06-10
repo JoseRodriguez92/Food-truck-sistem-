@@ -39,18 +39,21 @@ export type Database = {
         Row: {
           combo_id: number
           description: string | null
+          image_url: string | null
           name: string
           price: number
         }
         Insert: {
           combo_id?: never
           description?: string | null
+          image_url?: string | null
           name: string
           price?: number
         }
         Update: {
           combo_id?: never
           description?: string | null
+          image_url?: string | null
           name?: string
           price?: number
         }
@@ -181,6 +184,108 @@ export type Database = {
           },
         ]
       }
+      expense: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          created_by: string
+          description: string
+          expense_id: number
+          normalized_at: string | null
+          paid_at: string | null
+          receipt_url: string
+          status: string
+          visible: boolean
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          created_by: string
+          description: string
+          expense_id?: number
+          normalized_at?: string | null
+          paid_at?: string | null
+          receipt_url: string
+          status?: string
+          visible?: boolean
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          created_by?: string
+          description?: string
+          expense_id?: number
+          normalized_at?: string | null
+          paid_at?: string | null
+          receipt_url?: string
+          status?: string
+          visible?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expense_payment: {
+        Row: {
+          admin_id: string
+          amount: number
+          expense_id: number
+          paid_at: string | null
+          payment_id: number
+          payment_receipt_url: string | null
+          status: string
+        }
+        Insert: {
+          admin_id: string
+          amount: number
+          expense_id: number
+          paid_at?: string | null
+          payment_id?: number
+          payment_receipt_url?: string | null
+          status?: string
+        }
+        Update: {
+          admin_id?: string
+          amount?: number
+          expense_id?: number
+          paid_at?: string | null
+          payment_id?: number
+          payment_receipt_url?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_payment_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_payment_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "expense"
+            referencedColumns: ["expense_id"]
+          },
+          {
+            foreignKeyName: "expense_payment_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "v_expenses_with_creator"
+            referencedColumns: ["expense_id"]
+          },
+        ]
+      }
       food_truck: {
         Row: {
           color: string | null
@@ -205,13 +310,48 @@ export type Database = {
         }
         Relationships: []
       }
+      foodtruck_has_ingredient: {
+        Row: {
+          foodtruck_id: number
+          foodtruck_ingredient_id: number
+          ingredient_id: number
+          stock: number
+        }
+        Insert: {
+          foodtruck_id: number
+          foodtruck_ingredient_id?: number
+          ingredient_id: number
+          stock?: number
+        }
+        Update: {
+          foodtruck_id?: number
+          foodtruck_ingredient_id?: number
+          ingredient_id?: number
+          stock?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "foodtruck_has_ingredient_foodtruck_id_fkey"
+            columns: ["foodtruck_id"]
+            isOneToOne: false
+            referencedRelation: "food_truck"
+            referencedColumns: ["food_truck_id"]
+          },
+          {
+            foreignKeyName: "foodtruck_has_ingredient_ingredient_id_fkey"
+            columns: ["ingredient_id"]
+            isOneToOne: false
+            referencedRelation: "ingredient"
+            referencedColumns: ["ingredient_id"]
+          },
+        ]
+      }
       ingredient: {
         Row: {
           created_at: string
           description: string | null
           ingredient_id: number
           name: string
-          stock: number
           unit: string
         }
         Insert: {
@@ -219,7 +359,6 @@ export type Database = {
           description?: string | null
           ingredient_id?: number
           name: string
-          stock?: number
           unit?: string
         }
         Update: {
@@ -227,10 +366,70 @@ export type Database = {
           description?: string | null
           ingredient_id?: number
           name?: string
-          stock?: number
           unit?: string
         }
         Relationships: []
+      }
+      ingredient_stock_movement: {
+        Row: {
+          created_at: string
+          foodtruck_id: number
+          ingredient_id: number
+          movement_id: number
+          notes: string | null
+          profile_id: string | null
+          quantity: number
+          stock_after: number
+          stock_before: number
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          foodtruck_id?: number
+          ingredient_id: number
+          movement_id?: never
+          notes?: string | null
+          profile_id?: string | null
+          quantity: number
+          stock_after: number
+          stock_before: number
+          type: string
+        }
+        Update: {
+          created_at?: string
+          foodtruck_id?: number
+          ingredient_id?: number
+          movement_id?: never
+          notes?: string | null
+          profile_id?: string | null
+          quantity?: number
+          stock_after?: number
+          stock_before?: number
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ingredient_stock_movement_foodtruck_id_fkey"
+            columns: ["foodtruck_id"]
+            isOneToOne: false
+            referencedRelation: "food_truck"
+            referencedColumns: ["food_truck_id"]
+          },
+          {
+            foreignKeyName: "ingredient_stock_movement_ingredient_id_fkey"
+            columns: ["ingredient_id"]
+            isOneToOne: false
+            referencedRelation: "ingredient"
+            referencedColumns: ["ingredient_id"]
+          },
+          {
+            foreignKeyName: "ingredient_stock_movement_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       liquidacion: {
         Row: {
@@ -955,10 +1154,97 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_admin_expense_summary: {
+        Row: {
+          admin_id: string | null
+          admin_name: string | null
+          paid_amount: number | null
+          paid_count: number | null
+          pending_amount: number | null
+          pending_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_payment_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_expense_payments_with_admin: {
+        Row: {
+          admin_email: string | null
+          admin_id: string | null
+          admin_name: string | null
+          amount: number | null
+          expense_id: number | null
+          paid_at: string | null
+          payment_id: number | null
+          payment_receipt_url: string | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_payment_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_payment_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "expense"
+            referencedColumns: ["expense_id"]
+          },
+          {
+            foreignKeyName: "expense_payment_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "v_expenses_with_creator"
+            referencedColumns: ["expense_id"]
+          },
+        ]
+      }
+      v_expenses_with_creator: {
+        Row: {
+          amount: number | null
+          category: string | null
+          created_at: string | null
+          created_by: string | null
+          created_by_email: string | null
+          created_by_name: string | null
+          description: string | null
+          expense_id: number | null
+          normalized_at: string | null
+          paid_at: string | null
+          receipt_url: string | null
+          status: string | null
+          visible: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
-      [_ in never]: never
+      normalize_pending_expenses: {
+        Args: never
+        Returns: Record<string, unknown>
+      }
+      normalize_selected_expenses: {
+        Args: { expense_ids: number[] }
+        Returns: Record<string, unknown>
+      }
     }
     Enums: {
       user_status: "pending" | "active" | "inactive" | "suspended"

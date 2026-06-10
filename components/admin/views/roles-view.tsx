@@ -83,7 +83,7 @@ export function RolesView({ roles }: { roles: Role[] }) {
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold" style={{ fontFamily: "var(--font-space-grotesk)" }}>Roles</h1>
+          <h1 className="text-2xl sm:text-6xl text-foreground" style={{ fontFamily: "var(--font-space-grotesk)" }}>Roles</h1>
           <p className="text-sm text-muted-foreground mt-1">{roles.length} roles registrados</p>
         </div>
         <Button onClick={() => setCreateOpen(true)} className="gap-2">
