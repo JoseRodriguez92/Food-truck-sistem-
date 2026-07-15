@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
+import { PermissionsProvider } from "@/contexts/PermissionsContext";
 
 export const metadata = { title: "Admin — 3 Street Food" };
 
@@ -26,7 +27,7 @@ export default async function AdminLayout({
 
   const rolesRaw = roleData?.roles as unknown as { name: string } | { name: string }[] | null;
   const roleName = (Array.isArray(rolesRaw) ? rolesRaw[0] : rolesRaw)?.name?.toLowerCase();
-  if (roleName !== "admin" && roleName !== "staff") redirect("/menu");
+  if (roleName !== "admin" && roleName !== "employ") redirect("/menu");
 
   // Perfil del usuario
   const { data: profile } = await supabase
@@ -36,11 +37,13 @@ export default async function AdminLayout({
     .single();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <AdminSidebar profile={profile} />
-      <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
-        {children}
-      </main>
-    </div>
+    <PermissionsProvider>
+      <div className="flex h-screen overflow-hidden bg-background">
+        <AdminSidebar profile={profile} />
+        <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
+          {children}
+        </main>
+      </div>
+    </PermissionsProvider>
   );
 }

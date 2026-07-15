@@ -19,7 +19,7 @@ export async function createCategory(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.from("category").insert(parsed.data);
   if (error) return { error: error.message };
-  revalidatePath("/admin/categories");
+  revalidatePath("/dashboard");
 }
 
 export async function updateCategory(id: number, formData: FormData) {
@@ -35,7 +35,7 @@ export async function updateCategory(id: number, formData: FormData) {
     .update(parsed.data)
     .eq("category_id", id);
   if (error) return { error: error.message };
-  revalidatePath("/admin/categories");
+  revalidatePath("/dashboard");
 }
 
 export async function deleteCategory(id: number) {
@@ -54,5 +54,5 @@ export async function deleteCategory(id: number) {
     .delete()
     .eq("category_id", id);
   if (error) return { error: error.message };
-  revalidatePath("/admin/categories");
+  revalidatePath("/dashboard");
 }

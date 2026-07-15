@@ -37,6 +37,7 @@ export type Database = {
       }
       combo: {
         Row: {
+          active: boolean | null
           combo_id: number
           description: string | null
           image_url: string | null
@@ -44,6 +45,7 @@ export type Database = {
           price: number
         }
         Insert: {
+          active?: boolean | null
           combo_id?: never
           description?: string | null
           image_url?: string | null
@@ -51,6 +53,7 @@ export type Database = {
           price?: number
         }
         Update: {
+          active?: boolean | null
           combo_id?: never
           description?: string | null
           image_url?: string | null
@@ -431,6 +434,47 @@ export type Database = {
           },
         ]
       }
+      insumo: {
+        Row: {
+          created_at: string
+          insumo_id: number
+          nombre: string
+          stock_actual: number
+          stock_minimo: number
+          tipo_insumo_id: number
+          unidad_medida: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          insumo_id?: number
+          nombre: string
+          stock_actual?: number
+          stock_minimo?: number
+          tipo_insumo_id: number
+          unidad_medida: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          insumo_id?: number
+          nombre?: string
+          stock_actual?: number
+          stock_minimo?: number
+          tipo_insumo_id?: number
+          unidad_medida?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insumo_tipo_insumo_id_fkey"
+            columns: ["tipo_insumo_id"]
+            isOneToOne: false
+            referencedRelation: "tipo_insumo"
+            referencedColumns: ["tipo_insumo_id"]
+          },
+        ]
+      }
       liquidacion: {
         Row: {
           created_at: string
@@ -694,6 +738,115 @@ export type Database = {
           },
         ]
       }
+      modules: {
+        Row: {
+          code: string
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          parent_id: string | null
+          route: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          parent_id?: string | null
+          route?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          parent_id?: string | null
+          route?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modules_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "modules_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "v_user_effective_permissions"
+            referencedColumns: ["module_id"]
+          },
+        ]
+      }
+      movimiento_inventario: {
+        Row: {
+          cantidad: number
+          created_at: string
+          insumo_id: number
+          movimiento_id: string
+          order_detail_id: string | null
+          profile_id: string | null
+          tipo: string
+        }
+        Insert: {
+          cantidad: number
+          created_at?: string
+          insumo_id: number
+          movimiento_id?: string
+          order_detail_id?: string | null
+          profile_id?: string | null
+          tipo: string
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string
+          insumo_id?: number
+          movimiento_id?: string
+          order_detail_id?: string | null
+          profile_id?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimiento_inventario_insumo_id_fkey"
+            columns: ["insumo_id"]
+            isOneToOne: false
+            referencedRelation: "insumo"
+            referencedColumns: ["insumo_id"]
+          },
+          {
+            foreignKeyName: "movimiento_inventario_order_detail_id_fkey"
+            columns: ["order_detail_id"]
+            isOneToOne: false
+            referencedRelation: "order_detail"
+            referencedColumns: ["order_detail_id"]
+          },
+          {
+            foreignKeyName: "movimiento_inventario_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_detail: {
         Row: {
           combo_id: number | null
@@ -800,6 +953,39 @@ export type Database = {
             referencedColumns: ["status_order_id"]
           },
         ]
+      }
+      permissions: {
+        Row: {
+          category: string | null
+          code: string
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          code: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       product: {
         Row: {
@@ -914,6 +1100,42 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "product_has_type_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product"
+            referencedColumns: ["product_id"]
+          },
+        ]
+      }
+      producto_has_insumo: {
+        Row: {
+          cantidad_requerida: number
+          insumo_id: number
+          product_id: number
+          producto_insumo_id: number
+        }
+        Insert: {
+          cantidad_requerida: number
+          insumo_id: number
+          product_id: number
+          producto_insumo_id?: number
+        }
+        Update: {
+          cantidad_requerida?: number
+          insumo_id?: number
+          product_id?: number
+          producto_insumo_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "producto_has_insumo_insumo_id_fkey"
+            columns: ["insumo_id"]
+            isOneToOne: false
+            referencedRelation: "insumo"
+            referencedColumns: ["insumo_id"]
+          },
+          {
+            foreignKeyName: "producto_has_insumo_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "product"
@@ -1101,20 +1323,105 @@ export type Database = {
         }
         Relationships: []
       }
+      role_permission: {
+        Row: {
+          conditions: Json | null
+          created_at: string | null
+          granted_at: string | null
+          granted_by: string | null
+          id: string
+          is_active: boolean | null
+          module_id: string
+          permission_id: string
+          role_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          conditions?: Json | null
+          created_at?: string | null
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          module_id: string
+          permission_id: string
+          role_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          conditions?: Json | null
+          created_at?: string | null
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          module_id?: string
+          permission_id?: string
+          role_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permission_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_permission_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_permission_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "v_user_effective_permissions"
+            referencedColumns: ["module_id"]
+          },
+          {
+            foreignKeyName: "role_permission_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_permission_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "v_user_effective_permissions"
+            referencedColumns: ["permission_id"]
+          },
+          {
+            foreignKeyName: "role_permission_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
+        ]
+      }
       roles: {
         Row: {
+          code: string
           created_at: string
           description: string | null
           name: string
           role_id: string
         }
         Insert: {
+          code: string
           created_at?: string
           description?: string | null
           name: string
           role_id?: string
         }
         Update: {
+          code?: string
           created_at?: string
           description?: string | null
           name?: string
@@ -1149,6 +1456,30 @@ export type Database = {
           name?: string
           sort_order?: number
           status_order_id?: string
+        }
+        Relationships: []
+      }
+      tipo_insumo: {
+        Row: {
+          created_at: string
+          descripcion: string | null
+          is_active: boolean
+          nombre: string
+          tipo_insumo_id: number
+        }
+        Insert: {
+          created_at?: string
+          descripcion?: string | null
+          is_active?: boolean
+          nombre: string
+          tipo_insumo_id?: number
+        }
+        Update: {
+          created_at?: string
+          descripcion?: string | null
+          is_active?: boolean
+          nombre?: string
+          tipo_insumo_id?: number
         }
         Relationships: []
       }
@@ -1235,8 +1566,64 @@ export type Database = {
           },
         ]
       }
+      v_module_hierarchy: {
+        Row: {
+          code: string | null
+          display_order: number | null
+          full_name_path: string | null
+          full_path: string | null
+          icon: string | null
+          id: string | null
+          is_active: boolean | null
+          level: number | null
+          name: string | null
+          parent_id: string | null
+          path_ids: string[] | null
+          route: string | null
+        }
+        Relationships: []
+      }
+      v_user_effective_permissions: {
+        Row: {
+          module_code: string | null
+          module_id: string | null
+          module_name: string | null
+          permission_code: string | null
+          permission_id: string | null
+          permission_name: string | null
+          profile_id: string | null
+          source: string | null
+          source_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_has_role_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      has_permission: {
+        Args: {
+          p_module_code: string
+          p_permission_code: string
+          p_profile_id: string
+        }
+        Returns: boolean
+      }
+      has_permission_inherited: {
+        Args: {
+          p_module_code: string
+          p_permission_code: string
+          p_profile_id: string
+        }
+        Returns: boolean
+      }
+      is_admin_user: { Args: never; Returns: boolean }
       normalize_pending_expenses: {
         Args: never
         Returns: Record<string, unknown>
@@ -1247,6 +1634,12 @@ export type Database = {
       }
     }
     Enums: {
+      unidad_medida_enum:
+        | "gramos"
+        | "mililitros"
+        | "unidad"
+        | "kilogramo"
+        | "litro"
       user_status: "pending" | "active" | "inactive" | "suspended"
     }
     CompositeTypes: {
@@ -1375,6 +1768,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      unidad_medida_enum: [
+        "gramos",
+        "mililitros",
+        "unidad",
+        "kilogramo",
+        "litro",
+      ],
       user_status: ["pending", "active", "inactive", "suspended"],
     },
   },

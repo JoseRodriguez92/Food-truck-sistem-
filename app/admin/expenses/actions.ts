@@ -65,7 +65,7 @@ export async function createExpense(formData: FormData, receiptUrl: string) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -105,7 +105,7 @@ export async function updateExpense(
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -122,7 +122,7 @@ export async function deleteExpense(expenseId: number) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -136,7 +136,7 @@ export async function normalizePendingExpenses() {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/dashboard");
   return {
     success: true,
     data: data as {
@@ -163,7 +163,7 @@ export async function normalizeSelectedExpenses(expenseIds: number[]) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/dashboard");
   return {
     success: true,
     total: data.total_normalized || 0,
@@ -195,7 +195,7 @@ export async function markPaymentAsPaid(
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/expenses");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 

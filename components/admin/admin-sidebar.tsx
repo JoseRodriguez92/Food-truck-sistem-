@@ -17,6 +17,7 @@ import {
   BookOpen,
   Users,
   Shield,
+  KeySquare,
   Leaf,
   Tag,
   ClipboardList,
@@ -26,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { ProfilePopover } from "@/components/admin/profile-popover";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface Profile {
   first_name: string | null;
@@ -60,7 +62,26 @@ const catalogLinks = [
 const usersLinks = [
   { href: "/admin/users", label: "Usuarios", icon: Users },
   { href: "/admin/roles", label: "Roles", icon: Shield },
+  { href: "/admin/permisos", label: "Permisos", icon: KeySquare },
 ];
+
+// Mapeo href → module code (RBAC). Debe coincidir con supabase/migrations/create_rbac_system.sql
+const HREF_TO_MODULE: Record<string, string> = {
+  "/admin": "dashboard",
+  "/admin/orders": "orders",
+  "/admin/tareas": "tareas",
+  "/admin/expenses": "expenses",
+  "/admin/food-trucks": "trucks.food_trucks",
+  "/admin/locations": "trucks.locations",
+  "/admin/ingredients": "catalog.ingredients",
+  "/admin/categories": "catalog.categories",
+  "/admin/products": "catalog.products",
+  "/admin/combos": "catalog.combos",
+  "/admin/menus": "catalog.menus",
+  "/admin/users": "users.list",
+  "/admin/roles": "users.roles",
+  "/admin/permisos": "users.permissions",
+};
 
 function NavItems({
   pathname,
@@ -69,9 +90,23 @@ function NavItems({
   pathname: string;
   onNavigate?: () => void;
 }) {
-  const truckActive = truckLinks.some((l) => pathname.startsWith(l.href));
-  const catalogActive = catalogLinks.some((l) => pathname.startsWith(l.href));
-  const usersActive = usersLinks.some((l) => pathname.startsWith(l.href));
+  const { loading: permLoading, canRead } = usePermissions();
+
+  // Mientras cargan los permisos no ocultamos nada (evita parpadeo/bloqueo falso)
+  const canSee = (href: string) => {
+    if (permLoading) return true;
+    const moduleCode = HREF_TO_MODULE[href];
+    return moduleCode ? canRead(moduleCode) : true;
+  };
+
+  const visibleTopLinks = topLinks.filter((l) => canSee(l.href));
+  const visibleTruckLinks = truckLinks.filter((l) => canSee(l.href));
+  const visibleCatalogLinks = catalogLinks.filter((l) => canSee(l.href));
+  const visibleUsersLinks = usersLinks.filter((l) => canSee(l.href));
+
+  const truckActive = visibleTruckLinks.some((l) => pathname.startsWith(l.href));
+  const catalogActive = visibleCatalogLinks.some((l) => pathname.startsWith(l.href));
+  const usersActive = visibleUsersLinks.some((l) => pathname.startsWith(l.href));
   const [truckOpen, setTruckOpen] = useState(truckActive);
   const [catalogOpen, setCatalogOpen] = useState(catalogActive);
   const [usersOpen, setUsersOpen] = useState(usersActive);
@@ -83,7 +118,7 @@ function NavItems({
   return (
     <nav className="flex flex-col gap-1">
       {/* Links superiores */}
-      {topLinks.map(({ href, label, icon: Icon, exact }) => (
+      {visibleTopLinks.map(({ href, label, icon: Icon, exact }) => (
         <Link
           key={href}
           href={href}
@@ -100,158 +135,170 @@ function NavItems({
         </Link>
       ))}
 
-      <div
-        className="mx-3 my-1 h-px"
-        style={{
-          background:
-            "linear-gradient(90deg, transparent, rgba(232,197,71,0.4) 40%, rgba(232,197,71,0.4) 60%, transparent)",
-        }}
-      />
-
-      {/* Acordeón Food Trucks */}
-      <div>
-        <button
-          onClick={() => setTruckOpen((v) => !v)}
-          className={cn(
-            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-            truckActive
-              ? "text-foreground bg-accent"
-              : "text-muted-foreground hover:text-foreground hover:bg-accent",
-          )}
-        >
-          <Truck className="w-4 h-4 shrink-0" />
-          <span className="flex-1 text-left">Food Trucks</span>
-          <ChevronDown
-            className={cn(
-              "w-4 h-4 transition-transform duration-200",
-              truckOpen && "rotate-180",
-            )}
+      {visibleTruckLinks.length > 0 && (
+        <>
+          <div
+            className="mx-3 my-1 h-px"
+            style={{
+              background:
+                "linear-gradient(90deg, transparent, rgba(232,197,71,0.4) 40%, rgba(232,197,71,0.4) 60%, transparent)",
+            }}
           />
-        </button>
 
-        {truckOpen && (
-          <div className="ml-4 mt-1 flex flex-col gap-1 border-l border-border pl-3">
-            {truckLinks.map(({ href, label, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                onClick={onNavigate}
+          {/* Acordeón Food Trucks */}
+          <div>
+            <button
+              onClick={() => setTruckOpen((v) => !v)}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                truckActive
+                  ? "text-foreground bg-accent"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent",
+              )}
+            >
+              <Truck className="w-4 h-4 shrink-0" />
+              <span className="flex-1 text-left">Food Trucks</span>
+              <ChevronDown
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                  pathname.startsWith(href)
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent",
+                  "w-4 h-4 transition-transform duration-200",
+                  truckOpen && "rotate-180",
                 )}
-              >
-                <Icon className="w-3.5 h-3.5 shrink-0" />
-                {label}
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+              />
+            </button>
 
-      <div
-        className="mx-3 my-1 h-px"
-        style={{
-          background:
-            "linear-gradient(90deg, transparent, rgba(232,197,71,0.4) 40%, rgba(232,197,71,0.4) 60%, transparent)",
-        }}
-      />
-
-      {/* Acordeón Catálogo */}
-      <div>
-        <button
-          onClick={() => setCatalogOpen((v) => !v)}
-          className={cn(
-            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-            catalogActive
-              ? "text-foreground bg-accent"
-              : "text-muted-foreground hover:text-foreground hover:bg-accent",
-          )}
-        >
-          <BookOpen className="w-4 h-4 shrink-0" />
-          <span className="flex-1 text-left">Catálogo</span>
-          <ChevronDown
-            className={cn(
-              "w-4 h-4 transition-transform duration-200",
-              catalogOpen && "rotate-180",
+            {truckOpen && (
+              <div className="ml-4 mt-1 flex flex-col gap-1 border-l border-border pl-3">
+                {visibleTruckLinks.map(({ href, label, icon: Icon }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={onNavigate}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                      pathname.startsWith(href)
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent",
+                    )}
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    {label}
+                  </Link>
+                ))}
+              </div>
             )}
-          />
-        </button>
-
-        {catalogOpen && (
-          <div className="ml-4 mt-1 flex flex-col gap-1 border-l border-border pl-3">
-            {catalogLinks.map(({ href, label, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                onClick={onNavigate}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                  pathname.startsWith(href)
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent",
-                )}
-              >
-                <Icon className="w-3.5 h-3.5 shrink-0" />
-                {label}
-              </Link>
-            ))}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
-      <div
-        className="mx-3 my-1 h-px"
-        style={{
-          background:
-            "linear-gradient(90deg, transparent, rgba(232,197,71,0.4) 40%, rgba(232,197,71,0.4) 60%, transparent)",
-        }}
-      />
+      {visibleCatalogLinks.length > 0 && (
+        <>
+          <div
+            className="mx-3 my-1 h-px"
+            style={{
+              background:
+                "linear-gradient(90deg, transparent, rgba(232,197,71,0.4) 40%, rgba(232,197,71,0.4) 60%, transparent)",
+            }}
+          />
 
-      {/* Acordeón Usuarios */}
-      <div>
-        <button
-          onClick={() => setUsersOpen((v) => !v)}
-          className={cn(
-            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-            usersActive
-              ? "text-foreground bg-accent"
-              : "text-muted-foreground hover:text-foreground hover:bg-accent",
-          )}
-        >
-          <Users className="w-4 h-4 shrink-0" />
-          <span className="flex-1 text-left">Usuarios</span>
-          <ChevronDown
-            className={cn(
-              "w-4 h-4 transition-transform duration-200",
-              usersOpen && "rotate-180",
+          {/* Acordeón Catálogo */}
+          <div>
+            <button
+              onClick={() => setCatalogOpen((v) => !v)}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                catalogActive
+                  ? "text-foreground bg-accent"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent",
+              )}
+            >
+              <BookOpen className="w-4 h-4 shrink-0" />
+              <span className="flex-1 text-left">Catálogo</span>
+              <ChevronDown
+                className={cn(
+                  "w-4 h-4 transition-transform duration-200",
+                  catalogOpen && "rotate-180",
+                )}
+              />
+            </button>
+
+            {catalogOpen && (
+              <div className="ml-4 mt-1 flex flex-col gap-1 border-l border-border pl-3">
+                {visibleCatalogLinks.map(({ href, label, icon: Icon }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={onNavigate}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                      pathname.startsWith(href)
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent",
+                    )}
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    {label}
+                  </Link>
+                ))}
+              </div>
             )}
-          />
-        </button>
-
-        {usersOpen && (
-          <div className="ml-4 mt-1 flex flex-col gap-1 border-l border-border pl-3">
-            {usersLinks.map(({ href, label, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                onClick={onNavigate}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                  pathname.startsWith(href)
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent",
-                )}
-              >
-                <Icon className="w-3.5 h-3.5 shrink-0" />
-                {label}
-              </Link>
-            ))}
           </div>
-        )}
-      </div>
+        </>
+      )}
+
+      {visibleUsersLinks.length > 0 && (
+        <>
+          <div
+            className="mx-3 my-1 h-px"
+            style={{
+              background:
+                "linear-gradient(90deg, transparent, rgba(232,197,71,0.4) 40%, rgba(232,197,71,0.4) 60%, transparent)",
+            }}
+          />
+
+          {/* Acordeón Usuarios */}
+          <div>
+            <button
+              onClick={() => setUsersOpen((v) => !v)}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                usersActive
+                  ? "text-foreground bg-accent"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent",
+              )}
+            >
+              <Users className="w-4 h-4 shrink-0" />
+              <span className="flex-1 text-left">Usuarios</span>
+              <ChevronDown
+                className={cn(
+                  "w-4 h-4 transition-transform duration-200",
+                  usersOpen && "rotate-180",
+                )}
+              />
+            </button>
+
+            {usersOpen && (
+              <div className="ml-4 mt-1 flex flex-col gap-1 border-l border-border pl-3">
+                {visibleUsersLinks.map(({ href, label, icon: Icon }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={onNavigate}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                      pathname.startsWith(href)
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent",
+                    )}
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    {label}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </nav>
   );
 }

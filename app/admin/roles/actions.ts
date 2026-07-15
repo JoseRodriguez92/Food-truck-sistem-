@@ -19,7 +19,7 @@ export async function createRole(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.from("roles").insert(parsed.data);
   if (error) return { error: error.message };
-  revalidatePath("/admin/roles");
+  revalidatePath("/dashboard");
 }
 
 export async function updateRole(roleId: string, formData: FormData) {
@@ -35,7 +35,7 @@ export async function updateRole(roleId: string, formData: FormData) {
     .update(parsed.data)
     .eq("role_id", roleId);
   if (error) return { error: error.message };
-  revalidatePath("/admin/roles");
+  revalidatePath("/dashboard");
 }
 
 export async function deleteRole(roleId: string) {
@@ -52,5 +52,5 @@ export async function deleteRole(roleId: string) {
 
   const { error } = await supabase.from("roles").delete().eq("role_id", roleId);
   if (error) return { error: error.message };
-  revalidatePath("/admin/roles");
+  revalidatePath("/dashboard");
 }

@@ -14,7 +14,7 @@ function formatCOP(n: number) {
 
 function StatusBadge({ code }: { code: string }) {
   const map: Record<string, { label: string; icon: React.ElementType; className: string }> = {
-    pending:    { label: "Pendiente de pago", icon: Clock,       className: "text-yellow-500 bg-yellow-500/10 border-yellow-500/20" },
+    pending:    { label: "Pago pendiente (en persona)", icon: Clock, className: "text-yellow-500 bg-yellow-500/10 border-yellow-500/20" },
     confirmed:  { label: "Pago confirmado",   icon: CheckCircle, className: "text-green-500 bg-green-500/10 border-green-500/20" },
     preparing:  { label: "En preparación",    icon: Clock,       className: "text-blue-500 bg-blue-500/10 border-blue-500/20" },
     ready:      { label: "Lista para recoger",icon: CheckCircle, className: "text-primary bg-primary/10 border-primary/20" },
@@ -55,7 +55,9 @@ export default async function OrderPage({
       status_order(code, name),
       order_detail(
         order_detail_id, quantity, unit_price, line_total,
-        product_id, combo_id
+        product_id, combo_id,
+        product(name),
+        combo(name)
       )
     `)
     .eq("profile_order_id", id)
@@ -67,6 +69,10 @@ export default async function OrderPage({
   const statusOrderRaw = order.status_order as unknown as { code: string; name: string } | { code: string; name: string }[] | null;
   const statusOrder    = Array.isArray(statusOrderRaw) ? statusOrderRaw[0] : statusOrderRaw;
   const statusCode     = statusOrder?.code ?? "pending";
+
+  type NameJoin = { name: string } | { name: string }[] | null;
+  const oneName = (v: NameJoin) => (Array.isArray(v) ? v[0]?.name : v?.name) ?? null;
+
   const details    = (order.order_detail as {
     order_detail_id: string;
     quantity: number;
@@ -74,6 +80,8 @@ export default async function OrderPage({
     line_total: number;
     product_id: number | null;
     combo_id: number | null;
+    product: NameJoin;
+    combo: NameJoin;
   }[]) ?? [];
 
   const isSuccess  = statusCode === "confirmed" || statusCode === "preparing" || statusCode === "ready" || statusCode === "delivered";
@@ -107,14 +115,14 @@ export default async function OrderPage({
             }
           </div>
           <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-space-grotesk)" }}>
-            {isCancelled ? "Pago no completado" : isSuccess ? "¡Pedido confirmado!" : "Procesando pago..."}
+            {isCancelled ? "Pedido cancelado" : isSuccess ? "¡Pedido confirmado!" : "¡Pedido recibido!"}
           </h1>
           <p className="text-sm text-muted-foreground max-w-xs">
             {isCancelled
-              ? "Tu pago fue rechazado o cancelado. Puedes intentarlo de nuevo."
+              ? "Este pedido fue cancelado. Si creés que es un error, contactanos."
               : isSuccess
               ? `Tu orden #${order.order_number} fue recibida y está siendo procesada.`
-              : "Estamos verificando tu pago. Esto puede tomar unos segundos."
+              : "Pagás en efectivo o datáfono al retirar tu pedido."
             }
           </p>
           <StatusBadge code={statusCode} />
@@ -147,7 +155,11 @@ export default async function OrderPage({
               Items pedidos
             </div>
             <div className="divide-y divide-border">
-              {details.map((d) => (
+              {details.map((d) => {
+                const name = d.combo_id
+                  ? (oneName(d.combo) ?? `Combo #${d.combo_id}`)
+                  : (oneName(d.product) ?? `Producto #${d.product_id}`);
+                return (
                 <div key={d.order_detail_id} className="flex items-center gap-3 px-4 py-3">
                   <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
                     {d.combo_id
@@ -156,16 +168,15 @@ export default async function OrderPage({
                     }
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">
-                      {d.combo_id ? `Combo #${d.combo_id}` : `Producto #${d.product_id}`}
-                    </p>
+                    <p className="text-sm font-medium truncate">{name}</p>
                     <p className="text-xs text-muted-foreground">
                       {formatCOP(d.unit_price)} × {d.quantity}
                     </p>
                   </div>
                   <span className="text-sm font-semibold">{formatCOP(d.line_total)}</span>
                 </div>
-              ))}
+                );
+              })}
             </div>
             <div className="px-4 py-3 border-t border-border flex items-center justify-between font-bold">
               <span>Total</span>

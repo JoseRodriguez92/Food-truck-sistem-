@@ -96,6 +96,7 @@ import {
   getMenuDetail,
 } from "@/app/admin/locations/actions";
 import { LocationQR } from "@/components/admin/location-qr";
+import { SectionHeader } from "@/components/admin/section-header";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -940,23 +941,16 @@ export function LocationsView({
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1
-            className="text-2xl sm:text-6xl text-foreground"
-            style={{ fontFamily: "var(--font-space-grotesk)" }}
-          >
-            Ubicaciones
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {locations.length} ubicaciones registradas
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Nueva ubicación</span>
-        </Button>
-      </div>
+      <SectionHeader
+        title="Ubicaciones"
+        subtitle={`${locations.length} ubicaciones registradas`}
+        actions={
+          <Button onClick={() => setCreateOpen(true)} className="gap-2">
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Nueva ubicación</span>
+          </Button>
+        }
+      />
 
       {/* Mini mapa con las ubicaciones que tienen coordenadas */}
       {locations.some((l) => l.latitude != null) && (

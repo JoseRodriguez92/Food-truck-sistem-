@@ -23,7 +23,7 @@ export async function createFoodTruck(formData: FormData) {
   const { error } = await supabase.from("food_truck").insert(parsed.data);
 
   if (error) return { error: error.message };
-  revalidatePath("/admin/food-trucks");
+  revalidatePath("/dashboard");
 }
 
 export async function updateFoodTruck(id: number, formData: FormData) {
@@ -42,7 +42,7 @@ export async function updateFoodTruck(id: number, formData: FormData) {
     .eq("food_truck_id", id);
 
   if (error) return { error: error.message };
-  revalidatePath("/admin/food-trucks");
+  revalidatePath("/dashboard");
 }
 
 export async function deleteFoodTruck(id: number) {
@@ -53,5 +53,5 @@ export async function deleteFoodTruck(id: number) {
     .eq("food_truck_id", id);
 
   if (error) return { error: error.message };
-  revalidatePath("/admin/food-trucks");
+  revalidatePath("/dashboard");
 }

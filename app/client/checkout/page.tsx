@@ -43,16 +43,15 @@ export default function CheckoutPage() {
     );
   }
 
-  function handlePay() {
+  function handleConfirm() {
     startTransition(async () => {
       const result = await createOrder(items, locationId);
       if ("error" in result) {
         toast.error(result.error);
         return;
       }
-      // Limpiar carrito antes de redirigir a MP
       clearCart();
-      window.location.href = result.initPoint;
+      router.push(`/client/order/${result.profileOrderId}`);
     });
   }
 
@@ -129,7 +128,7 @@ export default function CheckoutPage() {
       <div className="fixed bottom-0 left-0 right-0 lg:left-60 bg-background/95 backdrop-blur-md border-t border-border p-4">
         <div className="max-w-lg mx-auto">
           <Button
-            onClick={handlePay}
+            onClick={handleConfirm}
             disabled={isPending}
             className="w-full h-12 text-base font-bold gap-2"
             size="lg"
@@ -137,17 +136,17 @@ export default function CheckoutPage() {
             {isPending ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Procesando...
+                Enviando...
               </>
             ) : (
               <>
                 <CreditCard className="w-5 h-5" />
-                Pagar {formatCOP(total())} con MercadoPago
+                Confirmar pedido — {formatCOP(total())}
               </>
             )}
           </Button>
           <p className="text-center text-xs text-muted-foreground mt-2">
-            Serás redirigido al portal seguro de MercadoPago
+            Pagás en efectivo o datáfono al retirar tu pedido
           </p>
         </div>
       </div>

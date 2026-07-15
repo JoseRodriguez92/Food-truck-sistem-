@@ -8,7 +8,7 @@ export type LoginResult = { error: string } | { redirect: string } | undefined;
 
 function getRedirectByRole(roleName: string): string {
   const normalized = roleName.toLowerCase().trim();
-  if (normalized === "admin" || normalized === "staff") return "/admin";
+  if (normalized === "admin" || normalized === "employ") return "/dashboard";
   return "/client";
 }
 

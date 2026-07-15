@@ -1,15 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
-import { CategoriesView, type Category } from "@/components/admin/views/categories-view";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Categorías — Admin" };
-
-export default async function CategoriesPage() {
-  const supabase = await createClient();
-
-  const { data: categories } = await supabase
-    .from("category")
-    .select("category_id, name, description, created_at")
-    .order("name");
-
-  return <CategoriesView categories={(categories ?? []) as Category[]} />;
+export default function CategoriesRedirect() {
+  redirect("/dashboard?section=catalog.categories");
 }

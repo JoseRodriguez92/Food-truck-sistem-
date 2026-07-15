@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, Trash2, Users, ChevronDown, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, ChevronDown, X, Truck } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -48,12 +48,16 @@ import {
   updateUser,
   addUserRole,
   removeUserRole,
+  addUserTruck,
+  removeUserTruck,
   deleteUser,
 } from "@/app/admin/users/actions";
+import { SectionHeader } from "@/components/admin/section-header";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type RoleOption = { role_id: string; name: string };
+export type TruckOption = { food_truck_id: number; name: string };
 
 export type UserProfile = {
   id: string;
@@ -68,6 +72,14 @@ export type UserProfile = {
     roles:
       | { role_id: string; name: string }
       | { role_id: string; name: string }[]
+      | null;
+  }[];
+  profile_has_food_truck: {
+    profile_food_truck_id: number;
+    food_truck_id: number;
+    food_truck:
+      | { food_truck_id: number; name: string }
+      | { food_truck_id: number; name: string }[]
       | null;
   }[];
 };
@@ -96,6 +108,30 @@ function getUserRoles(
       };
     })
     .filter((r) => r.role);
+}
+
+function toSingleTruck(
+  trucks:
+    | { food_truck_id: number; name: string }
+    | { food_truck_id: number; name: string }[]
+    | null,
+) {
+  if (!trucks) return null;
+  return Array.isArray(trucks) ? (trucks[0] ?? null) : trucks;
+}
+
+function getUserTrucks(
+  user: UserProfile,
+): Array<{ profile_food_truck_id: number; truck: { food_truck_id: number; name: string } }> {
+  return user.profile_has_food_truck
+    .map((pft) => {
+      const truck = toSingleTruck(pft.food_truck);
+      return {
+        profile_food_truck_id: pft.profile_food_truck_id,
+        truck: truck ?? { food_truck_id: pft.food_truck_id, name: "Sin nombre" },
+      };
+    })
+    .filter((t) => t.truck);
 }
 
 function statusLabel(status: string | null) {
@@ -413,14 +449,124 @@ function MultiRoleManager({
   );
 }
 
+// ─── Multi Truck Manager ──────────────────────────────────────────────────────
+// Restringe (vía RLS) qué pedidos/datos puede ver un usuario según su(s) truck(s).
+
+function MultiTruckManager({
+  userId,
+  userTrucks,
+  allTrucks,
+}: {
+  userId: string;
+  userTrucks: Array<{
+    profile_food_truck_id: number;
+    truck: { food_truck_id: number; name: string };
+  }>;
+  allTrucks: TruckOption[];
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [selectedTruckId, setSelectedTruckId] = useState("");
+  const [showSelect, setShowSelect] = useState(false);
+
+  const usedTruckIds = new Set(userTrucks.map((ut) => ut.truck.food_truck_id));
+  const availableTrucks = allTrucks.filter((t) => !usedTruckIds.has(t.food_truck_id));
+
+  function handleAdd() {
+    if (!selectedTruckId) return;
+    startTransition(async () => {
+      const result = await addUserTruck(userId, Number(selectedTruckId));
+      if (result?.error) toast.error(result.error);
+      else {
+        toast.success("Truck asignado");
+        setSelectedTruckId("");
+        setShowSelect(false);
+      }
+    });
+  }
+
+  function handleRemove(profileFoodTruckId: number) {
+    startTransition(async () => {
+      const result = await removeUserTruck(profileFoodTruckId);
+      if (result?.error) toast.error(result.error);
+      else toast.success("Truck removido");
+    });
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {userTrucks.map((ut) => (
+        <Badge key={ut.profile_food_truck_id} variant="secondary" className="gap-1 pr-1 text-xs">
+          <Truck className="w-2.5 h-2.5" />
+          {ut.truck.name}
+          <button
+            onClick={() => handleRemove(ut.profile_food_truck_id)}
+            disabled={isPending}
+            className="hover:text-destructive transition-colors ml-0.5"
+            aria-label="Remover truck"
+          >
+            <X className="w-2.5 h-2.5" />
+          </button>
+        </Badge>
+      ))}
+
+      {userTrucks.length === 0 && !showSelect && (
+        <span className="text-xs text-muted-foreground">Todos (sin restringir)</span>
+      )}
+
+      {showSelect ? (
+        <div className="flex items-center gap-1">
+          <Select value={selectedTruckId} onValueChange={setSelectedTruckId} disabled={isPending}>
+            <SelectTrigger className="h-7 text-xs w-32">
+              <SelectValue placeholder="Truck..." />
+            </SelectTrigger>
+            <SelectContent>
+              {availableTrucks.map((t) => (
+                <SelectItem key={t.food_truck_id} value={String(t.food_truck_id)} className="text-xs">
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            disabled={!selectedTruckId || isPending}
+            onClick={handleAdd}
+          >
+            <Plus className="w-3 h-3" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={() => {
+              setShowSelect(false);
+              setSelectedTruckId("");
+            }}
+          >
+            <X className="w-3 h-3" />
+          </Button>
+        </div>
+      ) : availableTrucks.length > 0 ? (
+        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setShowSelect(true)} disabled={isPending}>
+          <Plus className="w-3 h-3" />
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 // ─── Main View ────────────────────────────────────────────────────────────────
 
 export function UsersView({
   users,
   roles,
+  trucks,
 }: {
   users: UserProfile[];
   roles: RoleOption[];
+  trucks: TruckOption[];
 }) {
   const [isPending, startTransition] = useTransition();
   const [createOpen, setCreateOpen] = useState(false);
@@ -454,24 +600,16 @@ export function UsersView({
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1
-            className="text-2xl sm:text-6xl text-foreground"
-            style={{ fontFamily: "var(--font-space-grotesk)" }}
-          >
-            Usuarios
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {users.length} usuarios registrados
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Nuevo usuario</span>
-        </Button>
-      </div>
+      <SectionHeader
+        title="Usuarios"
+        subtitle={`${users.length} usuarios registrados`}
+        actions={
+          <Button onClick={() => setCreateOpen(true)} className="gap-2">
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Nuevo usuario</span>
+          </Button>
+        }
+      />
 
       {/* Table */}
       <div className="rounded-xl border border-border overflow-hidden">
@@ -487,6 +625,7 @@ export function UsersView({
                 <TableHead>Usuario</TableHead>
                 <TableHead className="hidden md:table-cell">Correo</TableHead>
                 <TableHead>Rol</TableHead>
+                <TableHead className="hidden lg:table-cell">Trucks</TableHead>
                 <TableHead className="hidden sm:table-cell">Estado</TableHead>
                 <TableHead className="hidden lg:table-cell">Creado</TableHead>
                 <TableHead className="w-24 text-right">Acciones</TableHead>
@@ -495,6 +634,7 @@ export function UsersView({
             <TableBody>
               {users.map((u) => {
                 const userRoles = getUserRoles(u);
+                const userTrucks = getUserTrucks(u);
                 const { label: statusText, variant: statusVariant } =
                   statusLabel(u.status);
                 const displayName =
@@ -522,6 +662,13 @@ export function UsersView({
                         userId={u.id}
                         userRoles={userRoles}
                         allRoles={roles}
+                      />
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      <MultiTruckManager
+                        userId={u.id}
+                        userTrucks={userTrucks}
+                        allTrucks={trucks}
                       />
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">

@@ -72,6 +72,7 @@ import {
   addProductToCombo,
   removeProductFromCombo,
 } from "@/app/admin/combos/actions";
+import { SectionHeader } from "@/components/admin/section-header";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 export type ProductOption = { product_id: number; name: string; price: number };
@@ -97,6 +98,7 @@ export type Combo = {
   description: string | null;
   price: number;
   image_url: string | null;
+  active?: boolean;
   combo_has_product: ComboProduct[];
 };
 
@@ -153,9 +155,9 @@ function ComboForm({
       setUploading(false);
       return;
     }
-    const { data: { publicUrl } } = supabase.storage
-      .from("combo-images")
-      .getPublicUrl(data.path);
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("combo-images").getPublicUrl(data.path);
     setImageUrl(publicUrl);
     setUploading(false);
   }
@@ -204,7 +206,10 @@ function ComboForm({
 
       {/* Imagen */}
       <div className="space-y-1.5">
-        <Label>Imagen <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+        <Label>
+          Imagen{" "}
+          <span className="text-muted-foreground text-xs">(opcional)</span>
+        </Label>
         <input type="hidden" name="image_url" value={imageUrl} />
         {imageUrl ? (
           <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-border">
@@ -641,44 +646,36 @@ export function CombosView({
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1
-            className="text-2xl sm:text-6xl text-foreground"
-            style={{ fontFamily: "var(--font-space-grotesk)" }}
-          >
-            Combos
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {combos.length} combos registrados
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-lg border border-border p-1 gap-1">
-            <Button
-              variant={view === "grid" ? "default" : "ghost"}
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setView("grid")}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
+      <SectionHeader
+        title="Combos"
+        subtitle={`${combos.length} combos registrados`}
+        actions={
+          <>
+            <div className="flex items-center rounded-lg border border-border p-1 gap-1">
+              <Button
+                variant={view === "grid" ? "default" : "ghost"}
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setView("grid")}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                variant={view === "list" ? "default" : "ghost"}
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setView("list")}
+              >
+                <LayoutList className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+            <Button onClick={() => setCreateOpen(true)} className="gap-2">
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Agregar</span>
             </Button>
-            <Button
-              variant={view === "list" ? "default" : "ghost"}
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setView("list")}
-            >
-              <LayoutList className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-          <Button onClick={() => setCreateOpen(true)} className="gap-2">
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Agregar</span>
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Vista cards */}
       {view === "grid" &&

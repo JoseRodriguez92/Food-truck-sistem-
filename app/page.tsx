@@ -2,6 +2,7 @@ import { Header } from "@/components/header"
 import { HeroSlider } from "@/components/hero-slider"
 import { ProductsSection } from "@/components/products-section"
 import { HistorySection } from "@/components/history-section"
+import { BuildYourTruckSection } from "@/components/build-your-truck-section"
 import { LocationsSection } from "@/components/locations-section"
 import { ContactSection } from "@/components/contact-section"
 import { OrderCTA } from "@/components/order-cta"
@@ -14,6 +15,7 @@ export default function Home() {
       <HeroSlider />
       <ProductsSection />
       <HistorySection />
+      <BuildYourTruckSection />
       <LocationsSection />
       <OrderCTA />
       <ContactSection />

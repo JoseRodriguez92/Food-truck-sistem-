@@ -71,7 +71,7 @@ export async function createUser(formData: FormData) {
   // 4. Enviar correo de bienvenida con link para establecer contraseña
   await sendWelcomeEmail(parsed.data.email, parsed.data.first_name);
 
-  revalidatePath("/admin/users");
+  revalidatePath("/dashboard");
 }
 
 export async function updateUser(userId: string, formData: FormData) {
@@ -93,7 +93,7 @@ export async function updateUser(userId: string, formData: FormData) {
     .eq("id", userId);
 
   if (error) return { error: error.message };
-  revalidatePath("/admin/users");
+  revalidatePath("/dashboard");
 }
 
 export async function addUserRole(userId: string, roleId: string) {
@@ -114,7 +114,7 @@ export async function addUserRole(userId: string, roleId: string) {
     .insert({ profile_id: userId, role_id: roleId });
 
   if (error) return { error: error.message };
-  revalidatePath("/admin/users");
+  revalidatePath("/dashboard");
 }
 
 export async function removeUserRole(profileRoleId: string) {
@@ -126,12 +126,46 @@ export async function removeUserRole(profileRoleId: string) {
     .eq("profile_role_id", profileRoleId);
 
   if (error) return { error: error.message };
-  revalidatePath("/admin/users");
+  revalidatePath("/dashboard");
 }
 
 export async function deleteUser(userId: string) {
   const admin = adminClient();
   const { error } = await admin.auth.admin.deleteUser(userId);
   if (error) return { error: error.message };
-  revalidatePath("/admin/users");
+  revalidatePath("/dashboard");
+}
+
+// ─── Asignación de trucks (para restringir acceso por RLS) ────────────────────
+
+export async function addUserTruck(userId: string, foodTruckId: number) {
+  const supabase = await createServerClient();
+
+  const { data: existing } = await supabase
+    .from("profile_has_food_truck")
+    .select("profile_food_truck_id")
+    .eq("profile_id", userId)
+    .eq("food_truck_id", foodTruckId)
+    .single();
+
+  if (existing) return { error: "El usuario ya está asignado a ese truck" };
+
+  const { error } = await supabase
+    .from("profile_has_food_truck")
+    .insert({ profile_id: userId, food_truck_id: foodTruckId });
+
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard");
+}
+
+export async function removeUserTruck(profileFoodTruckId: number) {
+  const supabase = await createServerClient();
+
+  const { error } = await supabase
+    .from("profile_has_food_truck")
+    .delete()
+    .eq("profile_food_truck_id", profileFoodTruckId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard");
 }

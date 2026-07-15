@@ -1,19 +1,24 @@
 "use server";
 
-import { MercadoPagoConfig, Preference, Payment } from "mercadopago";
+import { MercadoPagoConfig, Payment } from "mercadopago";
 import { createClient } from "@/lib/supabase/server";
 import type { CartItem } from "@/lib/store/cart";
 
-const mp = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN! });
+// NOTA: la pasarela de MercadoPago quedó DESACTIVADA (no eliminada) porque no
+// se puede costear la comisión. El pago pasa a ser manual: el pedido se crea
+// directo en estado "pending" y el staff lo confirma desde el panel (Pedidos)
+// cuando recibe el pago en persona (efectivo / datáfono).
+// Si en algún momento se reactiva la pasarela, `verifyAndConfirmPayment` más
+// abajo ya queda listo para usarse de nuevo.
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const mp = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN ?? "" });
 
-// ─── Crear orden + preferencia MP ─────────────────────────────────────────────
+// ─── Crear orden (pago manual, sin pasarela) ──────────────────────────────────
 
 export async function createOrder(
   items: CartItem[],
-  locationId?: number | null
-): Promise<{ initPoint: string; profileOrderId: string } | { error: string }> {
+  locationId?: number | null,
+): Promise<{ profileOrderId: string; orderNumber: number } | { error: string }> {
   if (!items.length) return { error: "El carrito está vacío" };
 
   const supabase = await createClient();
@@ -37,6 +42,7 @@ export async function createOrder(
     .insert({
       profile_id:      user.id,
       status_order_id: statusPending.status_order_id,
+      location_id:     locationId ?? null,
       subtotal,
       total:           subtotal,
     })
@@ -61,49 +67,15 @@ export async function createOrder(
     profile_order_id: order.profile_order_id,
     status_order_id:  statusPending.status_order_id,
     changed_by:       user.id,
-    notes:            "Orden creada, pendiente de pago",
+    notes:            "Pedido creado, pago pendiente en persona",
   });
 
-  // 6. Crear Preference en MercadoPago
-  const preference = new Preference(mp);
-  const mpItems = items.map((item) => ({
-    id:          String(item.itemId),
-    title:       item.name,
-    quantity:    item.quantity,
-    unit_price:  item.price,
-    currency_id: "COP",
-  }));
-
-  try {
-    const pref = await preference.create({
-      body: {
-        items:              mpItems,
-        external_reference: order.profile_order_id,
-        back_urls: {
-          success: `${BASE_URL}/client/order/${order.profile_order_id}?status=approved`,
-          failure: `${BASE_URL}/client/order/${order.profile_order_id}?status=rejected`,
-          pending: `${BASE_URL}/client/order/${order.profile_order_id}?status=pending`,
-        },
-        auto_return:       "approved",
-        notification_url:  `${BASE_URL}/api/mp-webhook`,
-        statement_descriptor: "3 STREET FOOD",
-        metadata: {
-          order_number: order.order_number,
-          location_id:  locationId ?? null,
-        },
-      },
-    });
-
-    if (!pref.init_point) return { error: "MercadoPago no devolvió init_point" };
-    return { initPoint: pref.init_point, profileOrderId: order.profile_order_id };
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "Error en MercadoPago";
-    return { error: msg };
-  }
+  return { profileOrderId: order.profile_order_id, orderNumber: order.order_number };
 }
 
-// ─── Verificar pago y actualizar estado ───────────────────────────────────────
-// Llamado desde la página de confirmación con el payment_id que MP pone en la URL
+// ─── (Desactivado) Verificar pago con MercadoPago ─────────────────────────────
+// Ya no se llama desde ningún lado — se deja el código intacto por si se
+// reactiva la pasarela más adelante.
 
 export async function verifyAndConfirmPayment(
   profileOrderId: string,

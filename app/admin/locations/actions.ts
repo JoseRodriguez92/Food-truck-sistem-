@@ -38,7 +38,7 @@ export async function createLocation(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.from("location").insert(payload);
   if (error) return { error: error.message };
-  revalidatePath("/admin/locations");
+  revalidatePath("/dashboard");
 }
 
 export async function updateLocation(locationId: number, formData: FormData) {
@@ -67,7 +67,7 @@ export async function updateLocation(locationId: number, formData: FormData) {
     .update(payload)
     .eq("location_id", locationId);
   if (error) return { error: error.message };
-  revalidatePath("/admin/locations");
+  revalidatePath("/dashboard");
 }
 
 export async function deleteLocation(locationId: number) {
@@ -87,7 +87,7 @@ export async function deleteLocation(locationId: number) {
     .delete()
     .eq("location_id", locationId);
   if (error) return { error: error.message };
-  revalidatePath("/admin/locations");
+  revalidatePath("/dashboard");
 }
 
 export async function assignMenuToLocation(locationId: number, menuId: number) {
@@ -96,7 +96,7 @@ export async function assignMenuToLocation(locationId: number, menuId: number) {
     .from("location_has_menu")
     .insert({ location_id: locationId, menu_id: menuId });
   if (error) return { error: error.message };
-  revalidatePath("/admin/locations");
+  revalidatePath("/dashboard");
 }
 
 export async function removeMenuFromLocation(locationMenuId: number) {
@@ -106,7 +106,7 @@ export async function removeMenuFromLocation(locationMenuId: number) {
     .delete()
     .eq("location_menu_id", locationMenuId);
   if (error) return { error: error.message };
-  revalidatePath("/admin/locations");
+  revalidatePath("/dashboard");
 }
 
 export async function getMenuDetail(menuId: number) {

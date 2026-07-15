@@ -62,6 +62,7 @@ import {
 } from "@/app/admin/ingredients/actions";
 import { StockAdjustDrawer } from "@/components/admin/stock-adjust-drawer";
 import { StockHistoryDrawer } from "@/components/admin/stock-history-drawer";
+import { SectionHeader } from "@/components/admin/section-header";
 
 export type Ingredient = {
   ingredient_id: number;
@@ -282,55 +283,45 @@ export function IngredientsView({
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1
-            className="text-2xl sm:text-6xl text-foreground"
-            style={{ fontFamily: "var(--font-space-grotesk)" }}
-          >
-            Ingredientes
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {ingredientsWithStock.length} ingrediente
-            {ingredientsWithStock.length !== 1 ? "s" : ""} registrado
-            {ingredientsWithStock.length !== 1 ? "s" : ""}
-          </p>
-        </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="flex items-center gap-2 bg-transparent shadow-lg shadow-primary/30 ring-2 ring-primary/20 border border-primary/30 rounded-lg px-3 py-2 cursor-pointer">
-            <Truck className="w-6 h-6 text-foreground" />
-            <Select
-              value={selectedTruck?.toString() ?? ""}
-              onValueChange={(v) => setSelectedTruck(Number(v))}
+      <SectionHeader
+        title="Ingredientes"
+        subtitle={`${ingredientsWithStock.length} ingrediente${ingredientsWithStock.length !== 1 ? "s" : ""} registrado${ingredientsWithStock.length !== 1 ? "s" : ""}`}
+        actions={
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="flex items-center gap-2 bg-transparent shadow-lg shadow-primary/30 ring-2 ring-primary/20 border border-primary/30 rounded-lg px-3 py-2 cursor-pointer">
+              <Truck className="w-6 h-6 text-foreground" />
+              <Select
+                value={selectedTruck?.toString() ?? ""}
+                onValueChange={(v) => setSelectedTruck(Number(v))}
+              >
+                <SelectTrigger className="w-full sm:w-50 !border-none !shadow-none !bg-transparent hover:!bg-transparent focus:!bg-transparent active:!bg-transparent focus:!ring-0 focus:!ring-offset-0 focus-visible:!ring-0 focus-visible:!ring-offset-0 data-[state=open]:!bg-transparent !h-auto !p-0 !outline-none">
+                  <SelectValue placeholder="Selecciona truck" />
+                </SelectTrigger>
+                <SelectContent>
+                  {trucks.map((truck) => (
+                    <SelectItem
+                      key={truck.food_truck_id}
+                      value={truck.food_truck_id.toString()}
+                    >
+                      {truck.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={() => {
+                setCreateUnit("gr");
+                setCreateOpen(true);
+              }}
+              className="gap-2 shrink-0"
             >
-              <SelectTrigger className="w-full sm:w-50 !border-none !shadow-none !bg-transparent hover:!bg-transparent focus:!bg-transparent active:!bg-transparent focus:!ring-0 focus:!ring-offset-0 focus-visible:!ring-0 focus-visible:!ring-offset-0 data-[state=open]:!bg-transparent !h-auto !p-0 !outline-none">
-                <SelectValue placeholder="Selecciona truck" />
-              </SelectTrigger>
-              <SelectContent>
-                {trucks.map((truck) => (
-                  <SelectItem
-                    key={truck.food_truck_id}
-                    value={truck.food_truck_id.toString()}
-                  >
-                    {truck.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Agregar</span>
+            </Button>
           </div>
-          <Button
-            onClick={() => {
-              setCreateUnit("gr");
-              setCreateOpen(true);
-            }}
-            className="gap-2 shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Agregar</span>
-          </Button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Tabla */}
       <div className="rounded-xl border border-border overflow-hidden">

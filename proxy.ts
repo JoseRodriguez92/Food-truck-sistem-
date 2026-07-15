@@ -29,18 +29,12 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  const protectedPrefixes = ["/admin", "/client", "/order", "/track", "/reset-password"];
+  const protectedPrefixes = ["/dashboard", "/admin", "/client", "/order", "/track", "/reset-password"];
   const isProtected = protectedPrefixes.some((p) => pathname.startsWith(p));
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
-  }
-
-  if (user && pathname === "/login") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
     return NextResponse.redirect(url);
   }
 

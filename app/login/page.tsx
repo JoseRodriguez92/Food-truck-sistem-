@@ -4,7 +4,7 @@ import { LoginForm } from "./login-form";
 
 function redirectByRole(roleName: string): string {
   const r = roleName.toLowerCase().trim();
-  if (r === "admin" || r === "staff") return "/admin";
+  if (r === "admin" || r === "employ") return "/dashboard";
   return "/client";
 }
 

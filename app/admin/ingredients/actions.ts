@@ -21,7 +21,7 @@ export async function createIngredient(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.from("ingredient").insert(parsed.data);
   if (error) return { error: error.message };
-  revalidatePath("/admin/ingredients");
+  revalidatePath("/dashboard");
 }
 
 export async function updateIngredient(id: number, formData: FormData) {
@@ -38,7 +38,7 @@ export async function updateIngredient(id: number, formData: FormData) {
     .update(parsed.data)
     .eq("ingredient_id", id);
   if (error) return { error: error.message };
-  revalidatePath("/admin/ingredients");
+  revalidatePath("/dashboard");
 }
 
 export async function deleteIngredient(id: number) {
@@ -59,7 +59,7 @@ export async function deleteIngredient(id: number) {
     .delete()
     .eq("ingredient_id", id);
   if (error) return { error: error.message };
-  revalidatePath("/admin/ingredients");
+  revalidatePath("/dashboard");
 }
 
 /* ── Stock ─────────────────────────────────────────────────────────────── */
@@ -141,7 +141,7 @@ export async function adjustStock(
     if (updErr) return { error: updErr.message };
   }
 
-  revalidatePath("/admin/ingredients");
+  revalidatePath("/dashboard");
 }
 
 export type StockMovement = {

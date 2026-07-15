@@ -76,6 +76,7 @@ import {
   addComboToMenu,
   removeComboFromMenu,
 } from "@/app/admin/menus/actions";
+import { SectionHeader } from "@/components/admin/section-header";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 export type FoodTruckOption = { food_truck_id: number; name: string };
@@ -1020,48 +1021,40 @@ export function MenusView({
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1
-            className="text-2xl sm:text-6xl text-foreground"
-            style={{ fontFamily: "var(--font-space-grotesk)" }}
-          >
-            Menús
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {menus.length} menús registrados
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-lg border border-border p-1 gap-1">
+      <SectionHeader
+        title="Menús"
+        subtitle={`${menus.length} menús registrados`}
+        actions={
+          <>
+            <div className="flex items-center rounded-lg border border-border p-1 gap-1">
+              <Button
+                variant={view === "grid" ? "default" : "ghost"}
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setView("grid")}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                variant={view === "list" ? "default" : "ghost"}
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setView("list")}
+              >
+                <LayoutList className="w-3.5 h-3.5" />
+              </Button>
+            </div>
             <Button
-              variant={view === "grid" ? "default" : "ghost"}
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setView("grid")}
+              onClick={() => setCreateOpen(true)}
+              className="gap-2"
+              disabled={trucks.length === 0}
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Agregar</span>
             </Button>
-            <Button
-              variant={view === "list" ? "default" : "ghost"}
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setView("list")}
-            >
-              <LayoutList className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-          <Button
-            onClick={() => setCreateOpen(true)}
-            className="gap-2"
-            disabled={trucks.length === 0}
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Agregar</span>
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {trucks.length === 0 && (
         <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/20 px-4 py-3">

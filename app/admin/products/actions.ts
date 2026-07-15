@@ -21,7 +21,7 @@ export async function createProduct(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.from("product").insert(parsed.data);
   if (error) return { error: error.message };
-  revalidatePath("/admin/products");
+  revalidatePath("/dashboard");
 }
 
 export async function updateProduct(id: number, formData: FormData) {
@@ -38,14 +38,14 @@ export async function updateProduct(id: number, formData: FormData) {
     .update(parsed.data)
     .eq("product_id", id);
   if (error) return { error: error.message };
-  revalidatePath("/admin/products");
+  revalidatePath("/dashboard");
 }
 
 export async function deleteProduct(id: number) {
   const supabase = await createClient();
   const { error } = await supabase.from("product").delete().eq("product_id", id);
   if (error) return { error: error.message };
-  revalidatePath("/admin/products");
+  revalidatePath("/dashboard");
 }
 
 export async function addProductImage(productId: number, imageUrl: string) {
@@ -54,7 +54,7 @@ export async function addProductImage(productId: number, imageUrl: string) {
     .from("product_has_image")
     .insert({ product_id: productId, image_url: imageUrl });
   if (error) return { error: error.message };
-  revalidatePath("/admin/products");
+  revalidatePath("/dashboard");
 }
 
 export async function deleteProductImage(productImageId: number) {
@@ -64,7 +64,7 @@ export async function deleteProductImage(productImageId: number) {
     .delete()
     .eq("product_image_id", productImageId);
   if (error) return { error: error.message };
-  revalidatePath("/admin/products");
+  revalidatePath("/dashboard");
 }
 
 export async function addProductType(productId: number, type: string) {
@@ -73,7 +73,7 @@ export async function addProductType(productId: number, type: string) {
     .from("product_has_type")
     .insert({ product_id: productId, type: type.trim() });
   if (error) return { error: error.message };
-  revalidatePath("/admin/products");
+  revalidatePath("/dashboard");
 }
 
 export async function deleteProductType(productTypeId: number) {
@@ -83,7 +83,7 @@ export async function deleteProductType(productTypeId: number) {
     .delete()
     .eq("product_type_id", productTypeId);
   if (error) return { error: error.message };
-  revalidatePath("/admin/products");
+  revalidatePath("/dashboard");
 }
 
 export async function addProductIngredient(productId: number, ingredientId: number, quantity: number) {
@@ -92,7 +92,7 @@ export async function addProductIngredient(productId: number, ingredientId: numb
     .from("product_has_ingredient")
     .insert({ product_id: productId, ingredient_id: ingredientId, quantity });
   if (error) return { error: error.message };
-  revalidatePath("/admin/products");
+  revalidatePath("/dashboard");
 }
 
 export async function setProductCategory(productId: number, categoryId: number | null) {
@@ -102,7 +102,7 @@ export async function setProductCategory(productId: number, categoryId: number |
     .update({ category_id: categoryId })
     .eq("product_id", productId);
   if (error) return { error: error.message };
-  revalidatePath("/admin/products");
+  revalidatePath("/dashboard");
 }
 
 export async function removeProductIngredient(productIngredientId: number) {
@@ -112,5 +112,5 @@ export async function removeProductIngredient(productIngredientId: number) {
     .delete()
     .eq("product_ingredient_id", productIngredientId);
   if (error) return { error: error.message };
-  revalidatePath("/admin/products");
+  revalidatePath("/dashboard");
 }

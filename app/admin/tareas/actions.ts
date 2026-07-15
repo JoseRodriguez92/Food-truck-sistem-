@@ -24,7 +24,7 @@ export async function updateTareaFecha(
       Fecha: { date: { start: fechaStart, end: fechaEnd ?? null } },
     },
   });
-  revalidatePath("/admin/tareas");
+  revalidatePath("/dashboard");
 }
 
 export interface TareaUpdate {
@@ -58,7 +58,7 @@ export async function updateTarea(pageId: string, data: TareaUpdate) {
     },
   });
 
-  revalidatePath("/admin/tareas");
+  revalidatePath("/dashboard");
 }
 
 export type CheckpointReminderResult = {

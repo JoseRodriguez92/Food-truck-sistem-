@@ -42,6 +42,7 @@ import {
   updateFoodTruck,
   deleteFoodTruck,
 } from "@/app/admin/food-trucks/actions";
+import { SectionHeader } from "@/components/admin/section-header";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 export type FoodTruck = {
@@ -182,24 +183,16 @@ export function FoodTrucksView({ trucks }: { trucks: FoodTruck[] }) {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1
-            className="text-2xl sm:text-6xl text-foreground"
-            style={{ fontFamily: "var(--font-space-grotesk)" }}
-          >
-            Food Trucks
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {trucks.length} {trucks.length === 1 ? "unidad registrada" : "unidades registradas"}
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Agregar</span>
-        </Button>
-      </div>
+      <SectionHeader
+        title="Food Trucks"
+        subtitle={`${trucks.length} ${trucks.length === 1 ? "unidad registrada" : "unidades registradas"}`}
+        actions={
+          <Button onClick={() => setCreateOpen(true)} className="gap-2">
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Agregar</span>
+          </Button>
+        }
+      />
 
       {/* Tabla */}
       <div className="rounded-xl border border-border overflow-hidden">

@@ -29,5 +29,5 @@ export async function updateOrderStatus(
     changed_by: user.id,
   });
 
-  revalidatePath("/admin");
+  revalidatePath("/dashboard");
 }

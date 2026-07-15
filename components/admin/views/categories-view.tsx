@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 import { createCategory, updateCategory, deleteCategory } from "@/app/admin/categories/actions";
+import { SectionHeader } from "@/components/admin/section-header";
 
 export type Category = {
   category_id: number;
@@ -89,21 +90,16 @@ export function CategoriesView({ categories }: { categories: Category[] }) {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-6xl text-foreground" style={{ fontFamily: "var(--font-space-grotesk)" }}>
-            Categorías
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {categories.length} categoría{categories.length !== 1 ? "s" : ""} registrada{categories.length !== 1 ? "s" : ""}
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Agregar</span>
-        </Button>
-      </div>
+      <SectionHeader
+        title="Categorías"
+        subtitle={`${categories.length} categoría${categories.length !== 1 ? "s" : ""} registrada${categories.length !== 1 ? "s" : ""}`}
+        actions={
+          <Button onClick={() => setCreateOpen(true)} className="gap-2">
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Agregar</span>
+          </Button>
+        }
+      />
 
       {/* Tabla */}
       <div className="rounded-xl border border-border overflow-hidden">

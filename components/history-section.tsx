@@ -11,11 +11,6 @@ export function HistorySection() {
                 <p className="text-muted-foreground text-sm sm:text-base">Nuestro Food Truck</p>
               </div>
             </div>
-            {/* Stats */}
-            <div className="absolute -bottom-4 -right-2 sm:-bottom-6 sm:-right-6 bg-primary text-primary-foreground p-4 sm:p-6 rounded-xl sm:rounded-2xl">
-              <div className="text-2xl sm:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>+5</div>
-              <div className="text-xs sm:text-sm opacity-90">Años de experiencia</div>
-            </div>
           </div>
 
           {/* Content */}
@@ -42,22 +37,6 @@ export function HistorySection() {
                 Cada día preparamos todo con ingredientes frescos y la misma pasión del primer día. 
                 Street food con actitud, eso es lo nuestro.
               </p>
-            </div>
-            
-            {/* Features */}
-            <div className="grid grid-cols-3 gap-3 sm:gap-6 pt-4 sm:pt-6">
-              <div className="text-center">
-                <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground" style={{ fontFamily: 'var(--font-display)' }}>100%</div>
-                <div className="text-xs sm:text-sm text-muted-foreground">Frescos</div>
-              </div>
-              <div className="text-center">
-                <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground" style={{ fontFamily: 'var(--font-display)' }}>50K+</div>
-                <div className="text-xs sm:text-sm text-muted-foreground">Clientes</div>
-              </div>
-              <div className="text-center">
-                <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground" style={{ fontFamily: 'var(--font-display)' }}>4.9</div>
-                <div className="text-xs sm:text-sm text-muted-foreground">Rating</div>
-              </div>
             </div>
           </div>
         </div>

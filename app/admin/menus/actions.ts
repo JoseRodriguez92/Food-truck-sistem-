@@ -20,7 +20,7 @@ export async function createMenu(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.from("menu").insert(parsed.data);
   if (error) return { error: error.message };
-  revalidatePath("/admin/menus");
+  revalidatePath("/dashboard");
 }
 
 export async function updateMenu(id: number, formData: FormData) {
@@ -33,14 +33,14 @@ export async function updateMenu(id: number, formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.from("menu").update(parsed.data).eq("menu_id", id);
   if (error) return { error: error.message };
-  revalidatePath("/admin/menus");
+  revalidatePath("/dashboard");
 }
 
 export async function deleteMenu(id: number) {
   const supabase = await createClient();
   const { error } = await supabase.from("menu").delete().eq("menu_id", id);
   if (error) return { error: error.message };
-  revalidatePath("/admin/menus");
+  revalidatePath("/dashboard");
 }
 
 // ── menu_has_product ───────────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ export async function addProductToMenu(menuId: number, productId: number) {
     .from("menu_has_product")
     .insert({ menu_id: menuId, product_id: productId });
   if (error) return { error: error.message };
-  revalidatePath("/admin/menus");
+  revalidatePath("/dashboard");
 }
 
 export async function removeProductFromMenu(menuProductId: number) {
@@ -60,7 +60,7 @@ export async function removeProductFromMenu(menuProductId: number) {
     .delete()
     .eq("menu_product_id", menuProductId);
   if (error) return { error: error.message };
-  revalidatePath("/admin/menus");
+  revalidatePath("/dashboard");
 }
 
 // ── menu_has_combo ─────────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ export async function addComboToMenu(menuId: number, comboId: number) {
     .from("menu_has_combo")
     .insert({ menu_id: menuId, combo_id: comboId });
   if (error) return { error: error.message };
-  revalidatePath("/admin/menus");
+  revalidatePath("/dashboard");
 }
 
 export async function removeComboFromMenu(menuComboId: number) {
@@ -80,5 +80,5 @@ export async function removeComboFromMenu(menuComboId: number) {
     .delete()
     .eq("menu_combo_id", menuComboId);
   if (error) return { error: error.message };
-  revalidatePath("/admin/menus");
+  revalidatePath("/dashboard");
 }

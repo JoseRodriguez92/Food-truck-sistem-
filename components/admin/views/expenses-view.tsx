@@ -65,6 +65,7 @@ import {
   uploadReceipt,
   deleteExpense,
 } from "@/app/admin/expenses/actions";
+import { SectionHeader } from "@/components/admin/section-header";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -453,38 +454,33 @@ export function ExpensesView({
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1
-            className="text-2xl sm:text-6xl text-foreground"
-            style={{ fontFamily: "var(--font-space-grotesk)" }}
-          >
-            Control de Gastos
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {filteredExpenses.length} gasto
-            {filteredExpenses.length !== 1 ? "s" : ""}
+      <SectionHeader
+        title="Control de Gastos"
+        subtitle={
+          <>
+            {filteredExpenses.length} gasto{filteredExpenses.length !== 1 ? "s" : ""}
             {hasActiveFilters && " (filtrado)"}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {pendingExpenses.length > 0 && (
-            <Button
-              variant="outline"
-              onClick={() => setNormalizeOpen(true)}
-              className="gap-2"
-            >
-              <Users className="w-4 h-4" />
-              Normalizar Pendientes
+          </>
+        }
+        actions={
+          <>
+            {pendingExpenses.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => setNormalizeOpen(true)}
+                className="gap-2"
+              >
+                <Users className="w-4 h-4" />
+                Normalizar Pendientes
+              </Button>
+            )}
+            <Button onClick={() => setCreateOpen(true)} className="gap-2">
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Registrar Gasto</span>
             </Button>
-          )}
-          <Button onClick={() => setCreateOpen(true)} className="gap-2">
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Registrar Gasto</span>
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Stats */}
       <StatsCards expenses={filteredExpenses} summary={currentUserSummary} />

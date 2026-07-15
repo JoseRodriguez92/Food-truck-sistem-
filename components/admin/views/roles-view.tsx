@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { createRole, updateRole, deleteRole } from "@/app/admin/roles/actions";
+import { SectionHeader } from "@/components/admin/section-header";
 
 export type Role = {
   role_id: string;
@@ -81,15 +82,15 @@ export function RolesView({ roles }: { roles: Role[] }) {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-6xl text-foreground" style={{ fontFamily: "var(--font-space-grotesk)" }}>Roles</h1>
-          <p className="text-sm text-muted-foreground mt-1">{roles.length} roles registrados</p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" /><span className="hidden sm:inline">Nuevo rol</span>
-        </Button>
-      </div>
+      <SectionHeader
+        title="Roles"
+        subtitle={`${roles.length} roles registrados`}
+        actions={
+          <Button onClick={() => setCreateOpen(true)} className="gap-2">
+            <Plus className="w-4 h-4" /><span className="hidden sm:inline">Nuevo rol</span>
+          </Button>
+        }
+      />
 
       <div className="rounded-xl border border-border overflow-hidden">
         {roles.length === 0 ? (

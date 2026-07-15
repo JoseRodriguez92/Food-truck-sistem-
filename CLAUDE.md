@@ -2,6 +2,8 @@
 
 > Guía de diseño y arquitectura para desarrollo con Claude Code.
 > Proyecto: App de pedidos para food truck, Next.js 15 + Tailwind CSS v4 + shadcn/ui.
+>
+> Para contexto de negocio (quiénes somos, misión, modelo con el fabricante de trucks) ver [`.claude/PROJECT.md`](.claude/PROJECT.md).
 
 ---
 

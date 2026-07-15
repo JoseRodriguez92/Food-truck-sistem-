@@ -22,6 +22,7 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { createProduct, updateProduct, deleteProduct, addProductImage, deleteProductImage, addProductType, deleteProductType, addProductIngredient, removeProductIngredient, setProductCategory } from "@/app/admin/products/actions";
+import { SectionHeader } from "@/components/admin/section-header";
 
 export type ProductImage      = { product_image_id: number; image_url: string };
 export type ProductType       = { product_type_id: number; type: string };
@@ -692,36 +693,35 @@ export function ProductsView({ products, allIngredients, allCategories }: { prod
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-6xl text-foreground" style={{ fontFamily: "var(--font-space-grotesk)" }}>Productos</h1>
-          <p className="text-sm text-muted-foreground mt-1">{products.length} productos registrados</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Toggle vista */}
-          <div className="flex items-center rounded-lg border border-border p-1 gap-1">
-            <Button
-              variant={view === "grid" ? "default" : "ghost"}
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setView("grid")}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
+      <SectionHeader
+        title="Productos"
+        subtitle={`${products.length} productos registrados`}
+        actions={
+          <>
+            <div className="flex items-center rounded-lg border border-border p-1 gap-1">
+              <Button
+                variant={view === "grid" ? "default" : "ghost"}
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setView("grid")}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                variant={view === "list" ? "default" : "ghost"}
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setView("list")}
+              >
+                <LayoutList className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+            <Button onClick={() => setCreateOpen(true)} className="gap-2">
+              <Plus className="w-4 h-4" /><span className="hidden sm:inline">Agregar</span>
             </Button>
-            <Button
-              variant={view === "list" ? "default" : "ghost"}
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setView("list")}
-            >
-              <LayoutList className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-          <Button onClick={() => setCreateOpen(true)} className="gap-2">
-            <Plus className="w-4 h-4" /><span className="hidden sm:inline">Agregar</span>
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Vista cards */}
       {view === "grid" && (
