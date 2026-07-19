@@ -298,7 +298,7 @@ export function DashboardSidebar({ profile }: { profile: Profile | null }) {
             className="h-15 w-auto margin-x-auto"
           />
         </div>
-        <div className="flex-1 p-3 overflow-y-auto">
+        <div className="flex-1 p-3 overflow-y-auto scrollbar-brand">
           <NavItems activeSection={activeSection} />
         </div>
         <UserFooter />
@@ -338,7 +338,7 @@ export function DashboardSidebar({ profile }: { profile: Profile | null }) {
                 className="h-8 w-auto"
               />
             </div>
-            <div className="flex-1 p-3 overflow-y-auto">
+            <div className="flex-1 p-3 overflow-y-auto scrollbar-brand">
               <NavItems activeSection={activeSection} onNavigate={() => setOpen(false)} />
             </div>
             <UserFooter />

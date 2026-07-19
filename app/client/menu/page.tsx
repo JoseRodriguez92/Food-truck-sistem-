@@ -1,25 +1,44 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MenuView } from "@/components/client/menu-view";
+import { LocationSwitcher } from "@/components/client/location-switcher";
 import { MapPin, UtensilsCrossed } from "lucide-react";
 import type { DirectionItem } from "@/components/client/directions-sheet";
 
 // ── Estados vacíos ──────────────────────────────────────────────────────────────
 
+type LocationOption = { location_id: number; name: string; city: string | null };
+
 function EmptyState({
   icon: Icon,
   title,
   description,
+  allLocations,
+  currentLocationId,
+  currentLabel,
 }: {
   icon: React.ElementType;
   title: string;
   description: string;
+  allLocations?: LocationOption[];
+  currentLocationId?: number | null;
+  currentLabel?: string;
 }) {
   return (
     <div className="relative flex flex-col items-center justify-center min-h-screen overflow-hidden bg-background px-6">
       {/* Blur orbs decorativos */}
       <div className="absolute top-1/4 right-0 w-72 h-72 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 left-0 w-56 h-56 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+
+      {allLocations && allLocations.length > 0 && (
+        <div className="absolute top-4 left-4 z-10">
+          <LocationSwitcher
+            locations={allLocations}
+            currentLocationId={currentLocationId}
+            currentLabel={currentLabel}
+          />
+        </div>
+      )}
 
       <div className="relative z-10 flex flex-col items-center text-center max-w-xs gap-5">
         {/* Ícono con glow */}
@@ -115,6 +134,7 @@ export default async function ClientMenuPage({
         icon={MapPin}
         title="Ubicación no encontrada"
         description="El código QR que escaneaste no corresponde a ninguna ubicación activa."
+        allLocations={allLocations ?? []}
       />
     );
   }
@@ -130,6 +150,9 @@ export default async function ClientMenuPage({
         icon={UtensilsCrossed}
         title="Sin menú disponible"
         description={`La ubicación "${location.name}" no tiene menús activos en este momento. Vuelve pronto.`}
+        allLocations={allLocations ?? []}
+        currentLocationId={locationId}
+        currentLabel={location.name}
       />
     );
   }
@@ -201,6 +224,9 @@ async function fetchAndRenderMenu(
         icon={UtensilsCrossed}
         title="Menú no encontrado"
         description="Este menú no existe o fue desactivado. Escanea el QR nuevamente."
+        allLocations={allLocations}
+        currentLocationId={locationCtx?.locationId}
+        currentLabel={locationCtx?.locationName}
       />
     );
   }

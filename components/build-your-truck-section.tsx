@@ -1,15 +1,8 @@
 "use client"
 
-import { ArrowRight, Wrench } from "lucide-react"
+import Link from "next/link"
+import { ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
 
 export function BuildYourTruckSection() {
   return (
@@ -42,37 +35,14 @@ export function BuildYourTruckSection() {
           </p>
         </div>
         <div className="mt-6 sm:mt-8 lg:mt-10">
-          <BuildYourTruckDialog />
+          <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold px-6 sm:px-8 gap-2 w-full sm:w-auto">
+            <Link href="/arma-tu-truck">
+              Arma El Tuyo Ya
+              <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
+            </Link>
+          </Button>
         </div>
       </div>
     </section>
-  )
-}
-
-function BuildYourTruckDialog() {
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold px-6 sm:px-8 gap-2 w-full sm:w-auto">
-          Arma El Tuyo Ya
-          <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md text-center">
-        <DialogHeader className="items-center">
-          <div className="w-14 h-14 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-2">
-            <Wrench className="w-6 h-6" />
-          </div>
-          <DialogTitle className="text-xl sm:text-2xl" style={{ fontFamily: "var(--font-display)" }}>
-            Próximamente
-          </DialogTitle>
-          <DialogDescription className="text-sm sm:text-base">
-            Estamos armando la experiencia para levantar los requerimientos de
-            tu trailer paso a paso. Muy pronto vas a poder arrancar tu
-            proyecto aquí mismo.
-          </DialogDescription>
-        </DialogHeader>
-      </DialogContent>
-    </Dialog>
   )
 }

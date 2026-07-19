@@ -43,7 +43,7 @@ export default async function DashboardLayout({
         <Suspense fallback={null}>
           <DashboardSidebar profile={profile} />
         </Suspense>
-        <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">{children}</main>
+        <main className="flex-1 overflow-y-auto pt-14 lg:pt-0 scrollbar-brand">{children}</main>
       </div>
     </PermissionsProvider>
   );

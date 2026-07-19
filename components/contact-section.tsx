@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Instagram, Facebook, Mail, Phone } from "lucide-react"
+import { Mail, Phone } from "lucide-react"
 
 export function ContactSection() {
   const [formData, setFormData] = useState({
@@ -60,27 +60,6 @@ export function ContactSection() {
                   <div className="text-xs sm:text-sm text-muted-foreground">Email</div>
                   <div className="text-sm sm:text-base font-medium text-foreground">hola@3streetfood.com</div>
                 </div>
-              </div>
-            </div>
-
-            {/* Social Links */}
-            <div>
-              <div className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">Síguenos</div>
-              <div className="flex gap-2 sm:gap-3">
-                <a 
-                  href="#" 
-                  className="w-9 h-9 sm:w-10 sm:h-10 bg-secondary rounded-full flex items-center justify-center text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
-                  aria-label="Instagram"
-                >
-                  <Instagram className="w-4 h-4 sm:w-5 sm:h-5" />
-                </a>
-                <a 
-                  href="#" 
-                  className="w-9 h-9 sm:w-10 sm:h-10 bg-secondary rounded-full flex items-center justify-center text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
-                  aria-label="Facebook"
-                >
-                  <Facebook className="w-4 h-4 sm:w-5 sm:h-5" />
-                </a>
               </div>
             </div>
           </div>

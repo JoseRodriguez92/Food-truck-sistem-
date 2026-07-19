@@ -2,22 +2,17 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { ShoppingCart, Plus, Minus, Trash2, Package, Layers, X, MapPin, CreditCard, Bike, Search, SearchX, ChevronDown, Check } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, Package, Layers, X, MapPin, CreditCard, Bike, Search, SearchX } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useCartStore } from "@/lib/store/cart";
 import { DirectionsSheet, type DirectionItem } from "@/components/client/directions-sheet";
+import { LocationSwitcher } from "@/components/client/location-switcher";
 import { showAddedToCart } from "@/components/client/brand-toast";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -218,7 +213,7 @@ function ProductCard({ mp }: { mp: MenuProduct }) {
   }
 
   return (
-    <div className="flex flex-col rounded-2xl border border-border bg-card overflow-hidden hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group">
+    <div className="w-[70%] sm:w-44 shrink-0 flex flex-col rounded-2xl border border-border bg-card overflow-hidden hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group">
       {/* Imagen */}
       <div className="relative h-40 bg-muted overflow-hidden">
         {thumb ? (
@@ -307,7 +302,7 @@ function ComboCard({ mc }: { mc: MenuCombo }) {
   }
 
   return (
-    <div className="flex flex-col rounded-2xl border border-border bg-card overflow-hidden hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group">
+    <div className="w-[70%] sm:w-44 shrink-0 flex flex-col rounded-2xl border border-border bg-card overflow-hidden hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group">
       {/* Mosaic */}
       <div className="relative h-40 bg-muted overflow-hidden">
         {thumbs.length === 0 ? (
@@ -484,30 +479,13 @@ export function MenuView({
         <div className="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-4">
           <div>
             {locationCtx && allLocations.length > 0 ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger className="flex items-center gap-1 mb-0.5 group outline-none">
-                  <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
-                  <span className="text-xs font-medium text-primary">{locationCtx.locationName}</span>
-                  <ChevronDown className="w-3 h-3 text-primary/70 transition-transform group-data-[state=open]:rotate-180" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  {allLocations.map((loc) => (
-                    <DropdownMenuItem
-                      key={loc.location_id}
-                      onSelect={() => router.push(`/client/menu?location=${loc.location_id}`)}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate">{loc.name}</p>
-                        {loc.city && <p className="text-xs text-muted-foreground truncate">{loc.city}</p>}
-                      </div>
-                      {loc.location_id === locationCtx.locationId && (
-                        <Check className="w-4 h-4 text-primary shrink-0" />
-                      )}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="mb-0.5">
+                <LocationSwitcher
+                  locations={allLocations}
+                  currentLocationId={locationCtx.locationId}
+                  currentLabel={locationCtx.locationName}
+                />
+              </div>
             ) : locationCtx && (
               <div className="flex items-center gap-1.5 mb-0.5">
                 <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
@@ -617,7 +595,7 @@ export function MenuView({
               <div className="flex-1 h-px bg-border" />
               <span className="text-xs text-muted-foreground">{items.length} item{items.length !== 1 ? "s" : ""}</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+            <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-1 scrollbar-brand">
               {items.map((mp) => <ProductCard key={mp.menu_product_id} mp={mp} />)}
             </div>
           </section>
@@ -633,7 +611,7 @@ export function MenuView({
               <div className="flex-1 h-px bg-border" />
               <span className="text-xs text-muted-foreground">{filteredCombos.length} combo{filteredCombos.length !== 1 ? "s" : ""}</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+            <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-1 scrollbar-brand">
               {filteredCombos.map((mc) => <ComboCard key={mc.menu_combo_id} mc={mc} />)}
             </div>
           </section>

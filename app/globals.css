@@ -139,3 +139,36 @@
 [data-sonner-toast] {
   width: 100%;
 }
+
+/* Scrollbar dorada de marca para paneles como el de notificaciones, en vez
+   del scrollbar gris/clásico por defecto del navegador.
+   Nota: ::-webkit-scrollbar-thumb no siempre hereda bien var(--primary)
+   en algunos navegadores/versiones (bug conocido de Chromium con custom
+   properties dentro de pseudo-elementos de scrollbar) — por eso el color
+   va hardcodeado acá en vez de con var(), aunque el resto del proyecto
+   use variables. Es el mismo dorado que --primary: oklch(0.7 0.18 45). */
+@utility scrollbar-brand {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.7 0.18 45) transparent;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: oklch(0.7 0.18 45);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: oklch(0.65 0.18 45);
+    background-clip: content-box;
+  }
+  &::-webkit-scrollbar-button {
+    display: none;
+  }
+}

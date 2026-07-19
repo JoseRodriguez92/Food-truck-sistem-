@@ -1,6 +1,6 @@
 import Link from "next/link"
 import Image from "next/image"
-import { Instagram, Facebook, Twitter } from "lucide-react"
+import { Instagram } from "lucide-react"
 
 const footerLinks = {
   menu: [
@@ -35,26 +35,41 @@ export function Footer() {
               Street food con actitud. Dorilocos, Crazy Fries, Boom Fries y Mindoggys. Sabores que explotan.
             </p>
             <div className="flex gap-2 sm:gap-3 mt-4 sm:mt-6">
-              <a 
-                href="#" 
-                className="w-9 h-9 sm:w-10 sm:h-10 bg-secondary rounded-full flex items-center justify-center text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
+              <a
+                href="https://www.instagram.com/tresstreetfood/"
+                target="_blank"
+                rel="noopener noreferrer"
                 aria-label="Instagram"
+                className="w-9 h-9 sm:w-10 sm:h-10 bg-secondary rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:text-white hover:scale-110 hover:shadow-lg hover:shadow-pink-500/30 hover:bg-linear-to-tr hover:from-yellow-400 hover:via-pink-500 hover:to-purple-600"
               >
                 <Instagram className="w-4 h-4 sm:w-5 sm:h-5" />
               </a>
-              <a 
-                href="#" 
-                className="w-9 h-9 sm:w-10 sm:h-10 bg-secondary rounded-full flex items-center justify-center text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
-                aria-label="Facebook"
+              <a
+                href="https://www.tiktok.com/@tresstreetfood"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="TikTok"
+                className="group w-9 h-9 sm:w-10 sm:h-10 bg-secondary rounded-full flex items-center justify-center text-muted-foreground transition-all duration-200 hover:scale-110 hover:shadow-lg hover:shadow-black/40 hover:bg-black"
               >
-                <Facebook className="w-4 h-4 sm:w-5 sm:h-5" />
-              </a>
-              <a 
-                href="#" 
-                className="w-9 h-9 sm:w-10 sm:h-10 bg-secondary rounded-full flex items-center justify-center text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
-                aria-label="Twitter"
-              >
-                <Twitter className="w-4 h-4 sm:w-5 sm:h-5" />
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" className="overflow-visible">
+                  <path
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    transform="translate(-0.9, -0.9)"
+                    fill="#25F4EE"
+                    d="M16.6 5.82c-1.02-.88-1.6-2.16-1.6-3.61h-3.03v13.83c0 1.55-1.26 2.81-2.81 2.81a2.81 2.81 0 0 1 0-5.62c.29 0 .57.04.84.13V10.4a5.85 5.85 0 0 0-.84-.06 5.84 5.84 0 1 0 5.84 5.84V9.4a8.44 8.44 0 0 0 4.94 1.58V7.95a5.62 5.62 0 0 1-3.34-2.13z"
+                  />
+                  <path
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    transform="translate(0.9, 0.9)"
+                    fill="#FE2C55"
+                    d="M16.6 5.82c-1.02-.88-1.6-2.16-1.6-3.61h-3.03v13.83c0 1.55-1.26 2.81-2.81 2.81a2.81 2.81 0 0 1 0-5.62c.29 0 .57.04.84.13V10.4a5.85 5.85 0 0 0-.84-.06 5.84 5.84 0 1 0 5.84 5.84V9.4a8.44 8.44 0 0 0 4.94 1.58V7.95a5.62 5.62 0 0 1-3.34-2.13z"
+                  />
+                  <path
+                    fill="currentColor"
+                    className="text-muted-foreground group-hover:text-white transition-colors"
+                    d="M16.6 5.82c-1.02-.88-1.6-2.16-1.6-3.61h-3.03v13.83c0 1.55-1.26 2.81-2.81 2.81a2.81 2.81 0 0 1 0-5.62c.29 0 .57.04.84.13V10.4a5.85 5.85 0 0 0-.84-.06 5.84 5.84 0 1 0 5.84 5.84V9.4a8.44 8.44 0 0 0 4.94 1.58V7.95a5.62 5.62 0 0 1-3.34-2.13z"
+                  />
+                </svg>
               </a>
             </div>
           </div>
@@ -96,7 +111,7 @@ export function Footer() {
         {/* Bottom */}
         <div className="border-t border-border mt-8 sm:mt-12 pt-6 sm:pt-8 flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4">
           <p className="text-xs sm:text-sm text-muted-foreground text-center sm:text-left">
-            © 2024 3 Street Food. Todos los derechos reservados.
+            © {new Date().getFullYear()} 3 Street Food. Todos los derechos reservados.
           </p>
           <p className="text-xs sm:text-sm text-muted-foreground">
             Hecho con pasión en la ciudad

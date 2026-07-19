@@ -26,7 +26,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useIsMobile } from "@/components/ui/use-mobile";
 import { cn } from "@/lib/utils";
 import { useNotifications, type AppNotification, type NotificationType } from "@/hooks/use-notifications";
@@ -76,7 +75,7 @@ function NotificationList({
   }
 
   return (
-    <ScrollArea className={scrollClassName}>
+    <div className={cn(scrollClassName, "overflow-y-auto scrollbar-brand")}>
       <div className="flex flex-col">
         {notifications.map((n) => {
           const Icon = TYPE_ICON[n.type] ?? Info;
@@ -126,7 +125,7 @@ function NotificationList({
           );
         })}
       </div>
-    </ScrollArea>
+    </div>
   );
 }
 
@@ -221,7 +220,7 @@ export function NotificationBell() {
             loading={loading}
             onItemClick={handleClick}
             onArchive={archive}
-            scrollClassName="flex-1"
+            scrollClassName="flex-1 min-h-0"
           />
         </SheetContent>
       </Sheet>
@@ -234,7 +233,15 @@ export function NotificationBell() {
       <PopoverContent
         align="end"
         sideOffset={8}
-        className="w-[min(22rem,calc(100vw-2rem))] p-0 rounded-xl shadow-lg overflow-hidden"
+        collisionPadding={12}
+        className={cn(
+          "w-[min(22rem,calc(100vw-2rem))] p-0 rounded-xl shadow-lg overflow-hidden",
+          // flex-col + max-height fijo (no depende de ninguna variable CSS
+          // de Radix que podría no estar resuelta) — así el div de la
+          // lista, con flex-1 min-h-0 + overflow-y-auto, siempre tiene una
+          // altura real que sobrepasar para poder scrollear.
+          "flex flex-col max-h-[26rem]",
+        )}
       >
         {header}
         {browserPrompt}
@@ -243,7 +250,7 @@ export function NotificationBell() {
           loading={loading}
           onItemClick={handleClick}
           onArchive={archive}
-          scrollClassName="max-h-96"
+          scrollClassName="flex-1 min-h-0"
         />
       </PopoverContent>
     </Popover>

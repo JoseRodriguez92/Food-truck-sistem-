@@ -4,9 +4,9 @@ import { useState, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Menu, X, LogIn, ClipboardList, Instagram } from "lucide-react";
+import { Menu, X, LogIn, ClipboardList, Instagram, UtensilsCrossed } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { ProfilePopover } from "@/components/admin/profile-popover";
@@ -27,6 +27,20 @@ function SidebarInner({ profile }: { profile: Profile | null }) {
   function NavItems({ onNavigate }: { onNavigate?: () => void }) {
     return (
       <nav className="flex flex-col gap-1">
+        <Link
+          href="/client/menu"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+            pathname.startsWith("/client/menu")
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground hover:bg-accent",
+          )}
+        >
+          <UtensilsCrossed className="w-4 h-4 shrink-0" />
+          Menú
+        </Link>
+
         {profile && (
           <Link
             href="/client/order"
@@ -166,6 +180,7 @@ function SidebarInner({ profile }: { profile: Profile | null }) {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-64 p-0 flex flex-col">
+              <SheetTitle className="sr-only">Menú</SheetTitle>
               <div className="flex items-center justify-center px-5 py-5 border-b border-border">
                 <Image
                   src="/LogoTipo-3StreetFood.svg"
