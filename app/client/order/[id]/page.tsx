@@ -1,36 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { CheckCircle, XCircle, Clock, Package, Layers, ChevronRight } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Package, Layers } from "lucide-react";
 import Link from "next/link";
 import { OrderStatusUpdater } from "./status-updater";
-
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-
-function formatCOP(n: number) {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency", currency: "COP", maximumFractionDigits: 0,
-  }).format(n);
-}
-
-function StatusBadge({ code }: { code: string }) {
-  const map: Record<string, { label: string; icon: React.ElementType; className: string }> = {
-    pending:    { label: "Pago pendiente (en persona)", icon: Clock, className: "text-yellow-500 bg-yellow-500/10 border-yellow-500/20" },
-    confirmed:  { label: "Pago confirmado",   icon: CheckCircle, className: "text-green-500 bg-green-500/10 border-green-500/20" },
-    preparing:  { label: "En preparación",    icon: Clock,       className: "text-blue-500 bg-blue-500/10 border-blue-500/20" },
-    ready:      { label: "Lista para recoger",icon: CheckCircle, className: "text-primary bg-primary/10 border-primary/20" },
-    on_the_way: { label: "En camino",         icon: ChevronRight,className: "text-primary bg-primary/10 border-primary/20" },
-    delivered:  { label: "Entregada",         icon: CheckCircle, className: "text-green-500 bg-green-500/10 border-green-500/20" },
-    cancelled:  { label: "Cancelada",         icon: XCircle,     className: "text-destructive bg-destructive/10 border-destructive/20" },
-  };
-  const cfg = map[code] ?? map["pending"];
-  const Icon = cfg.icon;
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-medium ${cfg.className}`}>
-      <Icon className="w-4 h-4" />
-      {cfg.label}
-    </span>
-  );
-}
+import { StatusBadge, formatCOP } from "@/components/client/order-status-badge";
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
 

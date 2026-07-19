@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { ShoppingCart, Package, Layers, ArrowLeft, CreditCard, Loader2 } from "lucide-react";
@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useCartStore } from "@/lib/store/cart";
+import { showBrandMessage } from "@/components/client/brand-toast";
 import { createOrder } from "./actions";
 
 function formatCOP(n: number) {
@@ -25,12 +26,14 @@ export default function CheckoutPage() {
   const { items, total, count, clearCart } = useCartStore();
   const [mounted, setMounted]   = useState(false);
   const [isPending, startTransition] = useTransition();
+  const confirmedRef = useRef(false);
 
   useEffect(() => setMounted(true), []);
 
-  // Redirigir si carrito vacío (solo después de montar)
+  // Redirigir si carrito vacío (solo después de montar) — salvo que sea porque
+  // el pedido ya se confirmó y estamos navegando a la orden (clearCart dispara esto igual).
   useEffect(() => {
-    if (mounted && items.length === 0) {
+    if (mounted && items.length === 0 && !confirmedRef.current) {
       router.replace(locationId ? `/client/menu?location=${locationId}` : "/client/menu");
     }
   }, [mounted, items.length, locationId, router]);
@@ -47,11 +50,21 @@ export default function CheckoutPage() {
     startTransition(async () => {
       const result = await createOrder(items, locationId);
       if ("error" in result) {
+        if (result.error === "No autenticado") {
+          const returnTo = locationId ? `/client/checkout?location=${locationId}` : "/client/checkout";
+          showBrandMessage({
+            headerText: "Un paso más",
+            message: "Inicia sesión para confirmar tu pedido",
+          });
+          router.push(`/login?redirect=${encodeURIComponent(returnTo)}`);
+          return;
+        }
         toast.error(result.error);
         return;
       }
-      clearCart();
+      confirmedRef.current = true;
       router.push(`/client/order/${result.profileOrderId}`);
+      clearCart();
     });
   }
 

@@ -133,7 +133,7 @@ export function StockHistoryDrawer({
                           >
                             {cfg.label}
                           </span>
-                          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                          <span className="text-[11px] text-muted-foreground whitespace-nowrap" suppressHydrationWarning>
                             {formatDate(mov.created_at)}
                           </span>
                         </div>

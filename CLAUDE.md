@@ -427,6 +427,12 @@ interface Order {
 - **Notificaciones:** usar `sonner` toast (ya instalado)
 - **Íconos:** solo Lucide React (no instalar otras librerías de íconos)
 - **Imágenes:** siempre `next/image` con `width`/`height` o `fill`
+- **Todo componente nuevo respeta el sistema de estilos de este documento desde el primer intento** — no queda "genérico" para pulir después. Esto aplica también a los defaults de shadcn/ui: varios (`Tooltip`, `Sheet` overlay, `Sonner`, etc.) traen colores/formas de fábrica que NO son la identidad de marca (ej. `Tooltip` por default es `bg-foreground` blanco/negro plano, no el `bg-popover` + borde que usa el resto de la app). Antes de dar por terminada cualquier UI nueva, revisar contra esta guía:
+  - Color: tokens de la sección **Sistema de Colores (OKLch)** — nunca colores Tailwind sueltos (`bg-white`, `text-black`) salvo integraciones de marca externa (ej. logos de Google/Instagram/TikTok que exigen su color real)
+  - Radios: escala de **Border Radius** (`rounded-md` botones/inputs, `rounded-xl`/`2xl` cards, `rounded-full` badges/avatares)
+  - Sombras: **Sombras** documentadas (`shadow-xs`, `shadow-lg`, glow con `hover:shadow-primary/…`)
+  - Glass/blur: si es overlay o nav flotante, usar **Glass Morphism** (`backdrop-blur-md` + `bg-background/80`)
+  - Si un componente shadcn se toca por primera vez y su estilo default no matchea, corregirlo ahí mismo (en `components/ui/`) para que quede bien en todos lados donde se use, no parchear solo la instancia puntual
 
 ---
 

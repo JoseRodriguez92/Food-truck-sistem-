@@ -192,7 +192,7 @@ export function DashboardView({
                             </p>
                           )}
                         </TableCell>
-                        <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+                        <TableCell className="hidden sm:table-cell text-sm text-muted-foreground" suppressHydrationWarning>
                           {formatTime(order.created_at)}
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-40 truncate">

@@ -29,7 +29,10 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  const protectedPrefixes = ["/dashboard", "/admin", "/client", "/order", "/track", "/reset-password"];
+  // "/client" queda fuera: guest browsing (menú y checkout públicos, login
+  // solo se exige al confirmar pedido). "/client/order/[id]" se protege
+  // aparte en su propio page.tsx (requiere ver la orden de su dueño).
+  const protectedPrefixes = ["/dashboard", "/admin", "/reset-password"];
   const isProtected = protectedPrefixes.some((p) => pathname.startsWith(p));
 
   if (!user && isProtected) {

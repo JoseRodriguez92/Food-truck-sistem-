@@ -132,3 +132,10 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Sonner: los toasts custom (toast.custom, data-styled="false") no heredan
+   width:100% del track del <ol> como sí lo hacen los toasts default — sin
+   esto quedan pegados a un lado con un hueco muerto hasta el borde real. */
+[data-sonner-toast] {
+  width: 100%;
+}

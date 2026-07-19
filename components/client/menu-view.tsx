@@ -1,22 +1,30 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { ShoppingCart, Plus, Minus, Trash2, Package, Layers, X, MapPin, CreditCard } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, Package, Layers, X, MapPin, CreditCard, Bike, Search, SearchX, ChevronDown, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 import { useCartStore } from "@/lib/store/cart";
 import { DirectionsSheet, type DirectionItem } from "@/components/client/directions-sheet";
+import { showAddedToCart } from "@/components/client/brand-toast";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 type ProductImage = { product_image_id: number; image_url: string };
 type ProductType  = { product_type_id: number; type: string };
+type Category     = { category_id: number; name: string };
 
 type MenuProduct = {
   menu_product_id: number;
@@ -28,6 +36,7 @@ type MenuProduct = {
     price: number;
     product_has_type:  ProductType  | ProductType[]  | null;
     product_has_image: ProductImage | ProductImage[] | null;
+    category: Category | Category[] | null;
   } | null;
 };
 
@@ -77,6 +86,10 @@ function toArray<T>(v: T | T[] | null | undefined): T[] {
 function toSingle<T>(v: T | T[] | null | undefined): T | null {
   if (!v) return null;
   return Array.isArray(v) ? (v[0] ?? null) : v;
+}
+
+function normalize(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
 function formatCOP(n: number) {
@@ -201,7 +214,7 @@ function ProductCard({ mp }: { mp: MenuProduct }) {
 
   function handleAdd() {
     addItem({ id: cartId, type: "product", itemId: p.product_id, name: p.name, price: p.price, image: thumb });
-    toast.success(`"${p.name}" agregado`);
+    showAddedToCart({ name: p.name, image: thumb, fallbackIcon: Package });
   }
 
   return (
@@ -290,7 +303,7 @@ function ComboCard({ mc }: { mc: MenuCombo }) {
 
   function handleAdd() {
     addItem({ id: cartId, type: "combo", itemId: combo.combo_id, name: combo.name, price: combo.price, image: thumbs[0] ?? null });
-    toast.success(`"${combo.name}" agregado`);
+    showAddedToCart({ name: combo.name, image: thumbs[0] ?? null, fallbackIcon: Layers });
   }
 
   return (
@@ -381,10 +394,12 @@ export function MenuView({
   menu,
   locationCtx,
   directions = [],
+  allLocations = [],
 }: {
   menu: MenuData;
   locationCtx?: LocationCtx;
   directions?: DirectionItem[];
+  allLocations?: { location_id: number; name: string; city: string | null }[];
 }) {
   const [cartOpen, setCartOpen]             = useState(false);
   const [directionsOpen, setDirectionsOpen] = useState(false);
@@ -394,12 +409,54 @@ export function MenuView({
   const total  = useCartStore((s) => s.total());
   const router = useRouter();
 
+  // ── Header sticky: se esconde al bajar, aparece al subir ────────────────────
+  const [headerHidden, setHeaderHidden] = useState(false);
+  const lastScrollY = useRef(0);
+  useEffect(() => {
+    function handleScroll() {
+      const currentY = window.scrollY;
+      const scrolledDown = currentY > lastScrollY.current;
+      setHeaderHidden(scrolledDown && currentY > 80);
+      lastScrollY.current = currentY;
+    }
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   const rawProducts = toArray(menu.menu_has_product);
   const rawCombos   = toArray(menu.menu_has_combo);
 
-  // Agrupar productos por type
+  // ── Búsqueda + filtro por categoría ──────────────────────────────────────
+  const [search, setSearch]             = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+
+  const categoryNames = [...new Set(
+    rawProducts
+      .map((mp) => toSingle(mp.product?.category ?? null)?.name)
+      .filter((n): n is string => !!n)
+  )].sort((a, b) => a.localeCompare(b));
+
+  const searchTerm = normalize(search.trim());
+
+  const filteredProducts = rawProducts.filter((mp) => {
+    if (!mp.product) return false;
+    const matchesSearch   = !searchTerm || normalize(mp.product.name).includes(searchTerm);
+    const productCategory = toSingle(mp.product.category)?.name;
+    const matchesCategory = categoryFilter === "all" || productCategory === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
+  const filteredCombos = categoryFilter !== "all" ? [] : rawCombos.filter((mc) => {
+    const combo = toSingle(mc.combo);
+    if (!combo) return false;
+    return !searchTerm || normalize(combo.name).includes(searchTerm);
+  });
+
+  const isFiltering = search.trim() !== "" || categoryFilter !== "all";
+
+  // Agrupar productos filtrados por type
   const groups = new Map<string, MenuProduct[]>();
-  for (const mp of rawProducts) {
+  for (const mp of filteredProducts) {
     if (!mp.product) continue;
     const types = toArray(mp.product.product_has_type);
     const keys  = types.length === 0 ? ["Otros"] : types.map((t) => t.type);
@@ -416,12 +473,42 @@ export function MenuView({
 
   return (
     <div className="relative min-h-screen">
-      {/* Header sticky */}
-      <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b border-border">
+      {/* Header sticky — se esconde al bajar, aparece al subir */}
+      <div
+        className={cn(
+          "sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b border-border transition-transform duration-300",
+          headerHidden ? "-translate-y-full" : "translate-y-0",
+        )}
+      >
         {/* Ubicación + carrito */}
         <div className="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-4">
           <div>
-            {locationCtx && (
+            {locationCtx && allLocations.length > 0 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger className="flex items-center gap-1 mb-0.5 group outline-none">
+                  <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="text-xs font-medium text-primary">{locationCtx.locationName}</span>
+                  <ChevronDown className="w-3 h-3 text-primary/70 transition-transform group-data-[state=open]:rotate-180" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  {allLocations.map((loc) => (
+                    <DropdownMenuItem
+                      key={loc.location_id}
+                      onSelect={() => router.push(`/client/menu?location=${loc.location_id}`)}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate">{loc.name}</p>
+                        {loc.city && <p className="text-xs text-muted-foreground truncate">{loc.city}</p>}
+                      </div>
+                      {loc.location_id === locationCtx.locationId && (
+                        <Check className="w-4 h-4 text-primary shrink-0" />
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : locationCtx && (
               <div className="flex items-center gap-1.5 mb-0.5">
                 <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
                 <span className="text-xs font-medium text-primary">{locationCtx.locationName}</span>
@@ -440,8 +527,8 @@ export function MenuView({
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-card text-sm font-medium hover:bg-accent hover:border-primary/40 transition-colors"
               title="Mis direcciones"
             >
-              <MapPin className="w-4 h-4 text-primary" />
-              <span className="hidden sm:inline text-muted-foreground">Ubicaciones</span>
+              <Bike className="w-4 h-4 text-primary" />
+              <span className="hidden sm:inline text-muted-foreground">Delivery</span>
             </button>
             <button
               onClick={() => setCartOpen(true)}
@@ -450,7 +537,7 @@ export function MenuView({
               <ShoppingCart className="w-4 h-4" />
               <span className="hidden sm:inline">Mi pedido</span>
               {mounted && count > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-card text-foreground text-xs flex items-center justify-center font-bold border border-border">
+                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-background text-foreground text-xs flex items-center justify-center font-bold border-2 border-primary">
                   {count}
                 </span>
               )}
@@ -476,9 +563,50 @@ export function MenuView({
             ))}
           </div>
         )}
+
+        {/* Búsqueda + filtro por categoría */}
+        <div className="px-4 sm:px-6 lg:px-8 pb-3 space-y-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar en el menú..."
+              className="w-full h-9 pl-9 pr-3 rounded-xl border border-border bg-card text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-colors"
+            />
+          </div>
+          {categoryNames.length > 0 && (
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
+              <button
+                onClick={() => setCategoryFilter("all")}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border ${
+                  categoryFilter === "all"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border text-muted-foreground hover:text-foreground hover:bg-accent"
+                }`}
+              >
+                Todas
+              </button>
+              {categoryNames.map((name) => (
+                <button
+                  key={name}
+                  onClick={() => setCategoryFilter(name)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border ${
+                    categoryFilter === name
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border text-muted-foreground hover:text-foreground hover:bg-accent"
+                  }`}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="p-4 sm:p-6 lg:p-8 space-y-10">
+      <div className={cn("p-4 sm:p-6 lg:p-8 space-y-10", mounted && count > 0 && "pb-28")}>
         {/* ── Productos agrupados por tipo ── */}
         {sortedGroups.length > 0 && sortedGroups.map(([groupName, items]) => (
           <section key={groupName}>
@@ -496,22 +624,35 @@ export function MenuView({
         ))}
 
         {/* ── Combos ── */}
-        {rawCombos.length > 0 && (
+        {filteredCombos.length > 0 && (
           <section>
             <div className="flex items-center gap-3 mb-4">
               <h2 className="text-base font-bold" style={{ fontFamily: "var(--font-space-grotesk)" }}>
                 Combos
               </h2>
               <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">{rawCombos.length} combo{rawCombos.length !== 1 ? "s" : ""}</span>
+              <span className="text-xs text-muted-foreground">{filteredCombos.length} combo{filteredCombos.length !== 1 ? "s" : ""}</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-              {rawCombos.map((mc) => <ComboCard key={mc.menu_combo_id} mc={mc} />)}
+              {filteredCombos.map((mc) => <ComboCard key={mc.menu_combo_id} mc={mc} />)}
             </div>
           </section>
         )}
 
-        {sortedGroups.length === 0 && rawCombos.length === 0 && (
+        {sortedGroups.length === 0 && filteredCombos.length === 0 && isFiltering && (
+          <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
+            <SearchX className="w-12 h-12 mb-3 opacity-20" />
+            <p className="text-sm">Sin resultados para tu búsqueda.</p>
+            <button
+              onClick={() => { setSearch(""); setCategoryFilter("all"); }}
+              className="mt-3 text-xs text-primary font-medium hover:underline"
+            >
+              Limpiar filtros
+            </button>
+          </div>
+        )}
+
+        {sortedGroups.length === 0 && filteredCombos.length === 0 && !isFiltering && (
           <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
             <Package className="w-12 h-12 mb-3 opacity-20" />
             <p className="text-sm">Este menú no tiene productos aún.</p>
@@ -521,12 +662,12 @@ export function MenuView({
 
       {/* Barra flotante del carrito (solo cuando hay items) */}
       {mounted && count > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 lg:left-[calc(50%+120px)]">
+        <div className="fixed bottom-4 sm:bottom-6 inset-x-4 flex justify-center z-40 lg:inset-x-auto lg:left-[calc(50%+120px)] lg:-translate-x-1/2">
           <button
             onClick={() => setCartOpen(true)}
-            className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/30 hover:bg-primary/90 transition-all duration-300 hover:shadow-xl hover:shadow-primary/40"
+            className="flex items-center gap-2 sm:gap-3 px-4 sm:px-5 py-3 rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/30 hover:bg-primary/90 transition-all duration-300 hover:shadow-xl hover:shadow-primary/40 whitespace-nowrap max-w-full"
           >
-            <ShoppingCart className="w-4 h-4" />
+            <ShoppingCart className="w-4 h-4 shrink-0" />
             <span className="font-semibold text-sm">{count} item{count !== 1 ? "s" : ""}</span>
             <span className="text-xs opacity-80">·</span>
             <span className="font-bold text-sm">{formatCOP(total)}</span>

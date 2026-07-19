@@ -8,11 +8,18 @@ function redirectByRole(roleName: string): string {
   return "/client";
 }
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirect?: string }>;
+}) {
+  const { redirect: redirectTo } = await searchParams;
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
 
   if (session) {
+    if (redirectTo?.startsWith("/")) redirect(redirectTo);
+
     const { data: roleData } = await supabase
       .from("profile_has_role")
       .select("roles(name)")
@@ -25,5 +32,5 @@ export default async function LoginPage() {
     redirect(redirectByRole(roleName));
   }
 
-  return <LoginForm />;
+  return <LoginForm redirectTo={redirectTo} />;
 }

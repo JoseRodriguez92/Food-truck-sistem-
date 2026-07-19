@@ -381,6 +381,7 @@ export type Database = {
           movement_id: number
           notes: string | null
           profile_id: string | null
+          profile_order_id: string | null
           quantity: number
           stock_after: number
           stock_before: number
@@ -393,6 +394,7 @@ export type Database = {
           movement_id?: never
           notes?: string | null
           profile_id?: string | null
+          profile_order_id?: string | null
           quantity: number
           stock_after: number
           stock_before: number
@@ -405,6 +407,7 @@ export type Database = {
           movement_id?: never
           notes?: string | null
           profile_id?: string | null
+          profile_order_id?: string | null
           quantity?: number
           stock_after?: number
           stock_before?: number
@@ -431,6 +434,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ingredient_stock_movement_profile_order_id_fkey"
+            columns: ["profile_order_id"]
+            isOneToOne: false
+            referencedRelation: "profile_has_order"
+            referencedColumns: ["profile_order_id"]
           },
         ]
       }
@@ -847,6 +857,71 @@ export type Database = {
           },
         ]
       }
+      notification: {
+        Row: {
+          action_label: string | null
+          category: string | null
+          created_at: string | null
+          expires_at: string | null
+          icon: string | null
+          id: string
+          is_archived: boolean | null
+          is_read: boolean | null
+          link_url: string | null
+          message: string | null
+          metadata: Json | null
+          profile_id: string
+          read_at: string | null
+          title: string
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          action_label?: string | null
+          category?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          icon?: string | null
+          id?: string
+          is_archived?: boolean | null
+          is_read?: boolean | null
+          link_url?: string | null
+          message?: string | null
+          metadata?: Json | null
+          profile_id: string
+          read_at?: string | null
+          title: string
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          action_label?: string | null
+          category?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          icon?: string | null
+          id?: string
+          is_archived?: boolean | null
+          is_read?: boolean | null
+          link_url?: string | null
+          message?: string | null
+          metadata?: Json | null
+          profile_id?: string
+          read_at?: string | null
+          title?: string
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_detail: {
         Row: {
           combo_id: number | null
@@ -1182,16 +1257,54 @@ export type Database = {
           },
         ]
       }
+      profile_has_food_truck: {
+        Row: {
+          created_at: string | null
+          food_truck_id: number
+          profile_food_truck_id: number
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          food_truck_id: number
+          profile_food_truck_id?: number
+          profile_id: string
+        }
+        Update: {
+          created_at?: string | null
+          food_truck_id?: number
+          profile_food_truck_id?: number
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_has_food_truck_food_truck_id_fkey"
+            columns: ["food_truck_id"]
+            isOneToOne: false
+            referencedRelation: "food_truck"
+            referencedColumns: ["food_truck_id"]
+          },
+          {
+            foreignKeyName: "profile_has_food_truck_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profile_has_order: {
         Row: {
           created_at: string
           delivery_fee: number
           discount_total: number
+          location_id: number | null
           notes: string | null
           order_number: number
-          profile_id: string
+          profile_id: string | null
           profile_order_id: string
           status_order_id: string | null
+          stock_deducted: boolean
           subtotal: number
           tax_total: number
           total: number
@@ -1201,11 +1314,13 @@ export type Database = {
           created_at?: string
           delivery_fee?: number
           discount_total?: number
+          location_id?: number | null
           notes?: string | null
           order_number?: never
-          profile_id: string
+          profile_id?: string | null
           profile_order_id?: string
           status_order_id?: string | null
+          stock_deducted?: boolean
           subtotal?: number
           tax_total?: number
           total?: number
@@ -1215,17 +1330,26 @@ export type Database = {
           created_at?: string
           delivery_fee?: number
           discount_total?: number
+          location_id?: number | null
           notes?: string | null
           order_number?: never
-          profile_id?: string
+          profile_id?: string | null
           profile_order_id?: string
           status_order_id?: string | null
+          stock_deducted?: boolean
           subtotal?: number
           tax_total?: number
           total?: number
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profile_has_order_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "location"
+            referencedColumns: ["location_id"]
+          },
           {
             foreignKeyName: "profile_has_order_profile_id_fkey"
             columns: ["profile_id"]
@@ -1583,6 +1707,38 @@ export type Database = {
         }
         Relationships: []
       }
+      v_unread_notifications: {
+        Row: {
+          action_label: string | null
+          category: string | null
+          created_at: string | null
+          email: string | null
+          expires_at: string | null
+          first_name: string | null
+          icon: string | null
+          id: string | null
+          is_archived: boolean | null
+          is_read: boolean | null
+          last_name: string | null
+          link_url: string | null
+          message: string | null
+          metadata: Json | null
+          profile_id: string | null
+          read_at: string | null
+          title: string | null
+          type: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_user_effective_permissions: {
         Row: {
           module_code: string | null
@@ -1607,6 +1763,36 @@ export type Database = {
       }
     }
     Functions: {
+      archive_notification: {
+        Args: { notification_id: string; user_id: string }
+        Returns: boolean
+      }
+      can_access_order: {
+        Args: { p_profile_id?: string; p_profile_order_id: string }
+        Returns: boolean
+      }
+      can_access_order_location: {
+        Args: { p_location_id: number; p_profile_id?: string }
+        Returns: boolean
+      }
+      create_notification: {
+        Args: {
+          p_category?: string
+          p_expires_at?: string
+          p_link_url?: string
+          p_message: string
+          p_metadata?: Json
+          p_profile_id: string
+          p_title: string
+          p_type?: string
+        }
+        Returns: string
+      }
+      deduct_order_stock: {
+        Args: { p_profile_order_id: string }
+        Returns: undefined
+      }
+      delete_expired_notifications: { Args: never; Returns: number }
       has_permission: {
         Args: {
           p_module_code: string
@@ -1623,7 +1809,20 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_truck_access: {
+        Args: { p_food_truck_id: number; p_profile_id?: string }
+        Returns: boolean
+      }
+      is_admin: { Args: { p_profile_id?: string }; Returns: boolean }
       is_admin_user: { Args: never; Returns: boolean }
+      mark_all_notifications_as_read: {
+        Args: { user_id: string }
+        Returns: number
+      }
+      mark_notification_as_read: {
+        Args: { notification_id: string; user_id: string }
+        Returns: boolean
+      }
       normalize_pending_expenses: {
         Args: never
         Returns: Record<string, unknown>
@@ -1631,6 +1830,19 @@ export type Database = {
       normalize_selected_expenses: {
         Args: { expense_ids: number[] }
         Returns: Record<string, unknown>
+      }
+      notify_low_stock: {
+        Args: {
+          p_food_truck_id: number
+          p_items: Json
+          p_order_number: number
+          p_truck_name: string
+        }
+        Returns: undefined
+      }
+      restock_order_stock: {
+        Args: { p_profile_order_id: string }
+        Returns: undefined
       }
     }
     Enums: {

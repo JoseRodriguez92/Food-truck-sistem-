@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Menu, X, ShoppingCart, MapPin } from "lucide-react";
+import { Menu, X, LogIn, ClipboardList, Instagram } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { useCartStore } from "@/lib/store/cart";
 import { ProfilePopover } from "@/components/admin/profile-popover";
+import { NotificationBell } from "@/components/admin/notification-bell";
 
 interface Profile {
   first_name: string | null;
@@ -18,94 +19,105 @@ interface Profile {
   avatar_url?: string | null;
 }
 
-type LocationItem = {
-  location_id: number;
-  name: string;
-  city: string | null;
-  food_truck:
-    | { food_truck_id: number; name: string; color: string | null }
-    | { food_truck_id: number; name: string; color: string | null }[]
-    | null;
-};
-
-function toSingle<T>(v: T | T[] | null): T | null {
-  if (!v) return null;
-  return Array.isArray(v) ? (v[0] ?? null) : v;
-}
-
-function SidebarInner({
-  profile,
-  locations,
-}: {
-  profile: Profile | null;
-  locations: LocationItem[];
-}) {
+function SidebarInner({ profile }: { profile: Profile | null }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const activeLocation = searchParams.get("location");
-  const count = useCartStore((s) => s.count());
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
 
   function NavItems({ onNavigate }: { onNavigate?: () => void }) {
     return (
       <nav className="flex flex-col gap-1">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest px-3 mb-1 mt-2">
-          Ubicaciones
-        </p>
-        {locations.length === 0 && (
-          <p className="text-xs text-muted-foreground px-3">
-            Sin ubicaciones disponibles
-          </p>
+        {profile && (
+          <Link
+            href="/client/order"
+            onClick={onNavigate}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+              pathname.startsWith("/client/order")
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent",
+            )}
+          >
+            <ClipboardList className="w-4 h-4 shrink-0" />
+            Mis pedidos
+          </Link>
         )}
-        {locations.map((loc) => {
-          const truck = toSingle(loc.food_truck);
-          const isActive =
-            activeLocation === String(loc.location_id) &&
-            pathname.startsWith("/client/menu");
-          return (
-            <Link
-              key={loc.location_id}
-              href={`/client/menu?location=${loc.location_id}`}
-              onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent",
-              )}
-            >
-              <MapPin className="w-4 h-4 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="truncate">{loc.name}</p>
-                {(loc.city || truck) && (
-                  <p
-                    className={cn(
-                      "text-xs truncate",
-                      isActive
-                        ? "text-primary-foreground/70"
-                        : "text-muted-foreground",
-                    )}
-                  >
-                    {[truck?.name, loc.city].filter(Boolean).join(" · ")}
-                  </p>
-                )}
-              </div>
-              {truck?.color && (
-                <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0 border border-white/20"
-                  style={{ backgroundColor: truck.color }}
-                />
-              )}
-            </Link>
-          );
-        })}
       </nav>
     );
   }
 
-  const UserFooter = () => <ProfilePopover profile={profile} />;
+  const UserFooter = () => {
+    if (profile) return <ProfilePopover profile={profile} />;
+
+    const search = searchParams.toString();
+    const returnTo = `${pathname}${search ? `?${search}` : ""}`;
+    return (
+      <div className="p-3 border-t border-border">
+        <Link
+          href={`/login?redirect=${encodeURIComponent(returnTo)}`}
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+        >
+          <LogIn className="w-4 h-4 shrink-0" />
+          Iniciar sesión
+        </Link>
+      </div>
+    );
+  };
+
+  const SocialLinks = () => (
+    <TooltipProvider>
+      <div className="flex items-center justify-center gap-3 px-3 py-4">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <a
+              href="https://www.instagram.com/tresstreetfood/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram"
+              className="flex items-center justify-center w-9 h-9 rounded-full text-muted-foreground bg-accent/50 transition-all duration-200 hover:text-white hover:scale-110 hover:shadow-lg hover:shadow-pink-500/30 hover:bg-linear-to-tr hover:from-yellow-400 hover:via-pink-500 hover:to-purple-600"
+            >
+              <Instagram className="w-4.5 h-4.5" />
+            </a>
+          </TooltipTrigger>
+          <TooltipContent>Síguenos</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <a
+              href="https://www.tiktok.com/@tresstreetfood"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="TikTok"
+              className="group flex items-center justify-center w-9 h-9 rounded-full text-muted-foreground bg-accent/50 transition-all duration-200 hover:scale-110 hover:shadow-lg hover:shadow-black/40 hover:bg-black"
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" className="overflow-visible">
+                {/* Glitch de marca: sombra cian + sombra roja detrás del glyph blanco */}
+                <path
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  transform="translate(-0.9, -0.9)"
+                  fill="#25F4EE"
+                  d="M16.6 5.82c-1.02-.88-1.6-2.16-1.6-3.61h-3.03v13.83c0 1.55-1.26 2.81-2.81 2.81a2.81 2.81 0 0 1 0-5.62c.29 0 .57.04.84.13V10.4a5.85 5.85 0 0 0-.84-.06 5.84 5.84 0 1 0 5.84 5.84V9.4a8.44 8.44 0 0 0 4.94 1.58V7.95a5.62 5.62 0 0 1-3.34-2.13z"
+                />
+                <path
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  transform="translate(0.9, 0.9)"
+                  fill="#FE2C55"
+                  d="M16.6 5.82c-1.02-.88-1.6-2.16-1.6-3.61h-3.03v13.83c0 1.55-1.26 2.81-2.81 2.81a2.81 2.81 0 0 1 0-5.62c.29 0 .57.04.84.13V10.4a5.85 5.85 0 0 0-.84-.06 5.84 5.84 0 1 0 5.84 5.84V9.4a8.44 8.44 0 0 0 4.94 1.58V7.95a5.62 5.62 0 0 1-3.34-2.13z"
+                />
+                <path
+                  fill="currentColor"
+                  className="text-muted-foreground group-hover:text-white transition-colors"
+                  d="M16.6 5.82c-1.02-.88-1.6-2.16-1.6-3.61h-3.03v13.83c0 1.55-1.26 2.81-2.81 2.81a2.81 2.81 0 0 1 0-5.62c.29 0 .57.04.84.13V10.4a5.85 5.85 0 0 0-.84-.06 5.84 5.84 0 1 0 5.84 5.84V9.4a8.44 8.44 0 0 0 4.94 1.58V7.95a5.62 5.62 0 0 1-3.34-2.13z"
+                />
+              </svg>
+            </a>
+          </TooltipTrigger>
+          <TooltipContent>Síguenos</TooltipContent>
+        </Tooltip>
+      </div>
+    </TooltipProvider>
+  );
 
   return (
     <>
@@ -118,9 +130,15 @@ function SidebarInner({
             className="h-15 w-auto"
           />
         </div>
+        {profile && (
+          <div className="flex items-center justify-end px-3 pt-3">
+            <NotificationBell />
+          </div>
+        )}
         <div className="flex-1 p-3 overflow-y-auto">
           <NavItems />
         </div>
+        <SocialLinks />
         <UserFooter />
       </aside>
 
@@ -135,15 +153,8 @@ function SidebarInner({
             className="h-7 w-auto"
           />
         </div>
-        <div className="flex items-center gap-2">
-          {mounted && count > 0 && (
-            <div className="relative">
-              <ShoppingCart className="w-5 h-5 text-primary" />
-              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
-                {count}
-              </span>
-            </div>
-          )}
+        <div className="flex items-center gap-1">
+          {profile && <NotificationBell />}
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -167,6 +178,7 @@ function SidebarInner({
               <div className="flex-1 p-3 overflow-y-auto">
                 <NavItems onNavigate={() => setOpen(false)} />
               </div>
+              <SocialLinks />
               <UserFooter />
             </SheetContent>
           </Sheet>
@@ -176,16 +188,10 @@ function SidebarInner({
   );
 }
 
-export function ClientSidebar({
-  profile,
-  locations,
-}: {
-  profile: Profile | null;
-  locations: LocationItem[];
-}) {
+export function ClientSidebar({ profile }: { profile: Profile | null }) {
   return (
     <Suspense fallback={null}>
-      <SidebarInner profile={profile} locations={locations} />
+      <SidebarInner profile={profile} />
     </Suspense>
   );
 }

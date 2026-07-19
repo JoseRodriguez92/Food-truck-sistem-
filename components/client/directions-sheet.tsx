@@ -175,9 +175,12 @@ export function DirectionsSheet({
 
             {/* Lista */}
             {directions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
+              <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2 text-center px-6">
                 <MapPin className="w-8 h-8 opacity-20" />
-                <p className="text-sm">Aún no tienes direcciones guardadas</p>
+                <p className="text-sm font-medium text-foreground">Aún no tienes direcciones guardadas</p>
+                <p className="text-xs text-muted-foreground max-w-60">
+                  Guardala una vez y quedará lista para tus próximos pedidos con domicilio — no la vas a tener que escribir de nuevo.
+                </p>
               </div>
             ) : (
               directions.map((item) => {

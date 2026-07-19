@@ -12,7 +12,10 @@ import gsap from "gsap";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GoogleAuthButton } from "@/components/auth/google-button";
 import { login } from "./actions";
+import { RegisterForm } from "./register-form";
 
 const loginSchema = z.object({
   email: z.string().email("Ingresa un correo válido"),
@@ -21,7 +24,7 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 
-export function LoginForm() {
+export function LoginForm({ redirectTo }: { redirectTo?: string }) {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -57,6 +60,7 @@ export function LoginForm() {
     const formData = new FormData();
     formData.set("email", data.email);
     formData.set("password", data.password);
+    if (redirectTo) formData.set("redirect", redirectTo);
     const result = await login(formData);
     if (!result) return;
     if ("error" in result) {
@@ -71,7 +75,7 @@ export function LoginForm() {
   }
 
   return (
-    <div ref={containerRef} className="relative min-h-screen bg-background flex items-center justify-center overflow-hidden px-4">
+    <div ref={containerRef} className="relative min-h-dvh bg-background flex items-center justify-center overflow-hidden px-4">
       {/* Blur orbs */}
       <div className="absolute top-0 right-0 w-72 sm:w-96 h-72 sm:h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-56 sm:w-80 h-56 sm:h-80 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
@@ -95,77 +99,103 @@ export function LoginForm() {
 
         {/* Card */}
         <div ref={cardRef} className="bg-card/80 backdrop-blur-md border border-border rounded-2xl p-6 sm:p-8 shadow-lg">
-          <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
-            <div className="login-field space-y-1.5">
-              <Label htmlFor="email" className="text-sm font-medium">
-                Correo electrónico
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="tu@correo.com"
-                autoComplete="email"
-                aria-invalid={!!errors.email}
-                {...register("email")}
-              />
-              {errors.email && (
-                <p className="text-xs text-destructive">{errors.email.message}</p>
-              )}
-            </div>
-
-            <div className="login-field space-y-1.5">
-              <Label htmlFor="password" className="text-sm font-medium">
-                Contraseña
-              </Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  className="pr-10"
-                  aria-invalid={!!errors.password}
-                  {...register("password")}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              {errors.password && (
-                <p className="text-xs text-destructive">{errors.password.message}</p>
-              )}
-              <div className="flex justify-end">
-                <Link
-                  href="/forgot-password"
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline"
-                >
-                  ¿Olvidaste tu contraseña?
-                </Link>
-              </div>
-            </div>
-
-            {serverError && (
-              <div className="login-field rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3">
-                <p className="text-sm text-destructive">{serverError}</p>
-              </div>
-            )}
-
-            <div className="login-field">
-              <Button
-                type="submit"
-                className="w-full mt-2"
-                size="lg"
-                disabled={isSubmitting}
+          <Tabs defaultValue="login" className="login-field">
+            <TabsList className="w-full mb-5">
+              <TabsTrigger
+                value="login"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:text-primary-foreground dark:data-[state=active]:border-transparent"
               >
-                {isSubmitting ? "Entrando..." : "Iniciar sesión"}
-              </Button>
-            </div>
-          </form>
+                Iniciar sesión
+              </TabsTrigger>
+              <TabsTrigger
+                value="register"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:text-primary-foreground dark:data-[state=active]:border-transparent"
+              >
+                Registrarte
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="login">
+              <div className="space-y-5">
+              <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="email" className="text-sm font-medium">
+                    Correo electrónico
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="tu@correo.com"
+                    autoComplete="email"
+                    aria-invalid={!!errors.email}
+                    {...register("email")}
+                  />
+                  {errors.email && (
+                    <p className="text-xs text-destructive">{errors.email.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="password" className="text-sm font-medium">
+                    Contraseña
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                      className="pr-10"
+                      aria-invalid={!!errors.password}
+                      {...register("password")}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {errors.password && (
+                    <p className="text-xs text-destructive">{errors.password.message}</p>
+                  )}
+                  <div className="flex justify-end">
+                    <Link
+                      href="/forgot-password"
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline"
+                    >
+                      ¿Olvidaste tu contraseña?
+                    </Link>
+                  </div>
+                </div>
+
+                {serverError && (
+                  <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3">
+                    <p className="text-sm text-destructive">{serverError}</p>
+                  </div>
+                )}
+
+                <Button type="submit" className="w-full mt-2" size="lg" disabled={isSubmitting}>
+                  {isSubmitting ? "Entrando..." : "Iniciar sesión"}
+                </Button>
+              </form>
+
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-muted-foreground">o continúa con</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+
+              <GoogleAuthButton redirectTo={redirectTo} label="Continuar con Google" />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="register">
+              <RegisterForm redirectTo={redirectTo} />
+            </TabsContent>
+          </Tabs>
         </div>
 
         <p ref={footerRef} className="text-center text-xs text-muted-foreground mt-6">

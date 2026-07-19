@@ -1,6 +1,7 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MenuView } from "@/components/client/menu-view";
-import { QrCode, MapPin, UtensilsCrossed } from "lucide-react";
+import { MapPin, UtensilsCrossed } from "lucide-react";
 import type { DirectionItem } from "@/components/client/directions-sheet";
 
 // ── Estados vacíos ──────────────────────────────────────────────────────────────
@@ -62,6 +63,13 @@ export default async function ClientMenuPage({
 
   const supabase = await createClient();
 
+  // ── Ubicaciones activas (para el dropdown del header) ──────────────────────
+  const { data: allLocations } = await supabase
+    .from("location")
+    .select("location_id, name, city")
+    .eq("estatus", true)
+    .order("name");
+
   // ── Directions del usuario autenticado ────────────────────────────────────
   const { data: { user } } = await supabase.auth.getUser();
   let directions: DirectionItem[] = [];
@@ -79,18 +87,12 @@ export default async function ClientMenuPage({
 
   // ── Modo directo por menu_id ───────────────────────────────────────────────
   if (directMenuId && !locationId) {
-    return fetchAndRenderMenu(supabase, directMenuId, undefined, directions);
+    return fetchAndRenderMenu(supabase, directMenuId, undefined, directions, allLocations ?? []);
   }
 
-  // ── Sin QR escaneado ───────────────────────────────────────────────────────
+  // ── Sin ubicación en la URL: reusar la detección automática de /client ──────
   if (!locationId) {
-    return (
-      <EmptyState
-        icon={QrCode}
-        title="Escanea el código QR"
-        description="Apunta la cámara al código QR de tu ubicación para ver el menú disponible."
-      />
-    );
+    redirect("/client");
   }
 
   // ── Obtener ubicación y sus menús ──────────────────────────────────────────
@@ -104,6 +106,7 @@ export default async function ClientMenuPage({
       )
     `)
     .eq("location_id", locationId)
+    .eq("estatus", true)
     .single();
 
   if (!location) {
@@ -140,7 +143,7 @@ export default async function ClientMenuPage({
     locationId,
     menus: assignedMenus,
     activeMenuId: targetMenuId,
-  }, directions);
+  }, directions, allLocations ?? []);
 }
 
 // ── Helper ─────────────────────────────────────────────────────────────────────
@@ -148,13 +151,14 @@ export default async function ClientMenuPage({
 async function fetchAndRenderMenu(
   supabase: Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>,
   menuId: number,
-  locationCtx?: {
+  locationCtx: {
     locationName: string;
     locationId: number;
     menus: { menu_id: number; name: string }[];
     activeMenuId: number;
-  },
-  directions: DirectionItem[] = []
+  } | undefined,
+  directions: DirectionItem[],
+  allLocations: { location_id: number; name: string; city: string | null }[]
 ) {
   const [{ data: menuBase }, { data: menuProducts }, { data: menuCombos }] = await Promise.all([
     supabase
@@ -170,7 +174,8 @@ async function fetchAndRenderMenu(
         product(
           product_id, name, description, price,
           product_has_type(product_type_id, type),
-          product_has_image(product_image_id, image_url)
+          product_has_image(product_image_id, image_url),
+          category(category_id, name)
         )
       `)
       .eq("menu_id", menuId),
@@ -206,5 +211,5 @@ async function fetchAndRenderMenu(
     menu_has_combo:   menuCombos   ?? [],
   };
 
-  return <MenuView menu={menu as never} locationCtx={locationCtx} directions={directions} />;
+  return <MenuView menu={menu as never} locationCtx={locationCtx} directions={directions} allLocations={allLocations} />;
 }

@@ -47,13 +47,20 @@ export function Header() {
             ))}
           </nav>
 
-          {/* CTA Button */}
-          <div className="hidden md:flex items-center gap-4">
+          {/* CTA Buttons */}
+          <div className="hidden md:flex items-center gap-3">
+            <Button
+              asChild
+              variant="outline"
+              className="font-semibold border-border text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary"
+            >
+              <Link href="/login">Login</Link>
+            </Button>
             <Button
               asChild
               className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
             >
-              <Link href="/login">Pide Online</Link>
+              <Link href="/client">Pide Online</Link>
             </Button>
           </div>
 
@@ -86,15 +93,27 @@ export function Header() {
                   {item.label}
                 </Link>
               ))}
-              <Button
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold mt-2"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  router.push("/login");
-                }}
-              >
-                Pide Online
-              </Button>
+              <div className="flex flex-col gap-2 mt-2">
+                <Button
+                  variant="outline"
+                  className="w-full font-semibold border-border text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    router.push("/login");
+                  }}
+                >
+                  Login
+                </Button>
+                <Button
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    router.push("/client");
+                  }}
+                >
+                  Pide Online
+                </Button>
+              </div>
             </nav>
           </div>
         )}

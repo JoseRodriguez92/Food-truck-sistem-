@@ -287,7 +287,7 @@ export function OrdersView({
                       <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                         {locationLabel(orderLocation)}
                       </TableCell>
-                      <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+                      <TableCell className="hidden sm:table-cell text-sm text-muted-foreground" suppressHydrationWarning>
                         {formatDateTime(order.created_at)}
                       </TableCell>
                       <TableCell className="text-right font-medium text-sm">{formatCurrency(order.total)}</TableCell>
@@ -343,7 +343,7 @@ export function OrdersView({
           {detailOrder && (
             <div className="px-4 pb-4 space-y-4">
               <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>{formatDateTime(detailOrder.created_at)}</span>
+                <span suppressHydrationWarning>{formatDateTime(detailOrder.created_at)}</span>
                 <span className="flex items-center gap-1">
                   <MapPin className="w-3 h-3" /> {locationLabel(one(detailOrder.location))}
                 </span>
