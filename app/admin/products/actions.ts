@@ -8,34 +8,41 @@ const productSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
   description: z.string().optional(),
   price: z.coerce.number().min(0, "El precio debe ser mayor a 0"),
+  partnerPrice: z.coerce.number().min(0, "El precio socio debe ser mayor a 0").optional(),
 });
 
 export async function createProduct(formData: FormData) {
+  const rawPartnerPrice = formData.get("partnerPrice");
   const parsed = productSchema.safeParse({
     name: formData.get("name"),
     description: formData.get("description") || undefined,
     price: formData.get("price"),
+    partnerPrice: rawPartnerPrice ? rawPartnerPrice : undefined,
   });
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("product").insert(parsed.data);
+  const { partnerPrice, ...rest } = parsed.data;
+  const { error } = await supabase.from("product").insert({ ...rest, partner_price: partnerPrice ?? null });
   if (error) return { error: error.message };
   revalidatePath("/dashboard");
 }
 
 export async function updateProduct(id: number, formData: FormData) {
+  const rawPartnerPrice = formData.get("partnerPrice");
   const parsed = productSchema.safeParse({
     name: formData.get("name"),
     description: formData.get("description") || undefined,
     price: formData.get("price"),
+    partnerPrice: rawPartnerPrice ? rawPartnerPrice : undefined,
   });
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
   const supabase = await createClient();
+  const { partnerPrice, ...rest } = parsed.data;
   const { error } = await supabase
     .from("product")
-    .update(parsed.data)
+    .update({ ...rest, partner_price: partnerPrice ?? null })
     .eq("product_id", id);
   if (error) return { error: error.message };
   revalidatePath("/dashboard");

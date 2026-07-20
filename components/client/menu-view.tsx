@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel";
 import { cn } from "@/lib/utils";
 import { useCartStore } from "@/lib/store/cart";
 import { DirectionsSheet, type DirectionItem } from "@/components/client/directions-sheet";
@@ -29,6 +30,7 @@ type MenuProduct = {
     name: string;
     description: string | null;
     price: number;
+    partner_price: number | null;
     product_has_type:  ProductType  | ProductType[]  | null;
     product_has_image: ProductImage | ProductImage[] | null;
     category: Category | Category[] | null;
@@ -191,9 +193,57 @@ function CartDrawer({ open, onClose, locationId }: { open: boolean; onClose: () 
   );
 }
 
+// ─── Fila de cards: carousel swipeable en mobile, grid desde sm ────────────────
+
+function CardRow({ items }: { items: React.ReactNode[] }) {
+  const [api, setApi] = useState<CarouselApi>();
+  const [selected, setSelected] = useState(0);
+
+  useEffect(() => {
+    if (!api) return;
+    setSelected(api.selectedScrollSnap());
+    api.on("select", () => setSelected(api.selectedScrollSnap()));
+  }, [api]);
+
+  return (
+    <>
+      {/* Mobile: carousel */}
+      <div className="sm:hidden">
+        <Carousel setApi={setApi} opts={{ align: "start", loop: false }}>
+          <CarouselContent className="-ml-4">
+            {items.map((item, i) => (
+              <CarouselItem key={i} className="basis-[82%] pl-4">
+                {item}
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+        </Carousel>
+        {items.length > 1 && (
+          <div className="flex justify-center gap-1.5 mt-3">
+            {items.map((_, i) => (
+              <span
+                key={i}
+                className={cn(
+                  "h-1.5 rounded-full transition-all",
+                  i === selected ? "w-6 bg-primary" : "w-1.5 bg-border",
+                )}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* sm+: grid estático */}
+      <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+        {items}
+      </div>
+    </>
+  );
+}
+
 // ─── Product Card ──────────────────────────────────────────────────────────────
 
-function ProductCard({ mp }: { mp: MenuProduct }) {
+function ProductCard({ mp, isSocio }: { mp: MenuProduct; isSocio: boolean }) {
   if (!mp.product) return null;
   const p = mp.product!;
 
@@ -201,31 +251,33 @@ function ProductCard({ mp }: { mp: MenuProduct }) {
   const items     = useCartStore((s) => s.items);
   const updateQty = useCartStore((s) => s.updateQty);
 
-  const cartId  = `product-${p.product_id}`;
-  const inCart  = items.find((i) => i.id === cartId);
-  const images  = toArray(p.product_has_image);
-  const types   = toArray(p.product_has_type);
-  const thumb   = images[0]?.image_url ?? null;
+  const cartId     = `product-${p.product_id}`;
+  const inCart     = items.find((i) => i.id === cartId);
+  const images     = toArray(p.product_has_image);
+  const types      = toArray(p.product_has_type);
+  const thumb      = images[0]?.image_url ?? null;
+  const hasSocioPrice = isSocio && p.partner_price != null;
+  const effectivePrice = hasSocioPrice ? p.partner_price! : p.price;
 
   function handleAdd() {
-    addItem({ id: cartId, type: "product", itemId: p.product_id, name: p.name, price: p.price, image: thumb });
+    addItem({ id: cartId, type: "product", itemId: p.product_id, name: p.name, price: effectivePrice, image: thumb });
     showAddedToCart({ name: p.name, image: thumb, fallbackIcon: Package });
   }
 
   return (
-    <div className="w-[70%] sm:w-44 shrink-0 flex flex-col rounded-2xl border border-border bg-card overflow-hidden hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group">
+    <div className="w-full flex flex-col rounded-2xl border border-border bg-card overflow-hidden hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group">
       {/* Imagen */}
-      <div className="relative h-40 bg-muted overflow-hidden">
+      <div className="relative h-56 bg-black overflow-hidden">
         {thumb ? (
-          <Image src={thumb} alt={p.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" unoptimized />
+          <Image src={thumb} alt={p.name} fill className="object-contain group-hover:scale-105 transition-transform duration-500" unoptimized />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Package className="w-10 h-10 text-muted-foreground opacity-20" />
+            <Package className="w-12 h-12 text-muted-foreground opacity-20" />
           </div>
         )}
         {/* Types */}
         {types.length > 0 && (
-          <div className="absolute top-2 left-2 flex flex-wrap gap-1">
+          <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1">
             {types.map((t) => (
               <span key={t.product_type_id} className="text-xs px-2 py-0.5 rounded-full bg-black/60 text-white backdrop-blur-sm">
                 {t.type}
@@ -236,37 +288,44 @@ function ProductCard({ mp }: { mp: MenuProduct }) {
       </div>
 
       {/* Info */}
-      <div className="flex flex-col flex-1 p-3 gap-2">
+      <div className="flex flex-col flex-1 p-4 gap-3">
         <div>
-          <h3 className="font-semibold text-sm leading-tight">{p.name}</h3>
+          <h3 className="font-semibold text-base leading-tight">{p.name}</h3>
           {p.description && (
-            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{p.description}</p>
+            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{p.description}</p>
           )}
         </div>
-        <div className="flex items-center justify-between mt-auto gap-2">
-          <span className="text-base font-bold text-primary">{formatCOP(p.price)}</span>
+        <div className="flex flex-col items-start sm:flex-row sm:items-center justify-between mt-auto gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-lg font-bold text-primary">{formatCOP(effectivePrice)}</span>
+            {hasSocioPrice && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                Socio
+              </span>
+            )}
+          </div>
           {inCart ? (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => updateQty(cartId, inCart.quantity - 1)}
-                className="w-7 h-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"
+                className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"
               >
-                {inCart.quantity === 1 ? <Trash2 className="w-3 h-3 text-destructive" /> : <Minus className="w-3 h-3" />}
+                {inCart.quantity === 1 ? <Trash2 className="w-3.5 h-3.5 text-destructive" /> : <Minus className="w-3.5 h-3.5" />}
               </button>
-              <span className="text-sm font-bold w-5 text-center">{inCart.quantity}</span>
+              <span className="text-base font-bold w-5 text-center">{inCart.quantity}</span>
               <button
                 onClick={() => updateQty(cartId, inCart.quantity + 1)}
-                className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors"
+                className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors"
               >
-                <Plus className="w-3 h-3" />
+                <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : (
             <button
               onClick={handleAdd}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
             >
-              <Plus className="w-3 h-3" />
+              <Plus className="w-3.5 h-3.5" />
               Agregar
             </button>
           )}
@@ -302,15 +361,15 @@ function ComboCard({ mc }: { mc: MenuCombo }) {
   }
 
   return (
-    <div className="w-[70%] sm:w-44 shrink-0 flex flex-col rounded-2xl border border-border bg-card overflow-hidden hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group">
+    <div className="w-full flex flex-col rounded-2xl border border-border bg-card overflow-hidden hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group">
       {/* Mosaic */}
-      <div className="relative h-40 bg-muted overflow-hidden">
+      <div className="relative h-56 bg-black overflow-hidden">
         {thumbs.length === 0 ? (
           <div className="w-full h-full flex items-center justify-center">
-            <Layers className="w-10 h-10 text-muted-foreground opacity-20" />
+            <Layers className="w-12 h-12 text-muted-foreground opacity-20" />
           </div>
         ) : thumbs.length === 1 ? (
-          <Image src={thumbs[0]} alt={combo.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" unoptimized />
+          <Image src={thumbs[0]} alt={combo.name} fill className="object-contain group-hover:scale-105 transition-transform duration-500" unoptimized />
         ) : (
           <div className={`grid h-full gap-0.5 ${thumbs.length >= 4 ? "grid-cols-2" : "grid-cols-2"}`}>
             {thumbs.slice(0, 4).map((url, i) => (
@@ -320,20 +379,20 @@ function ComboCard({ mc }: { mc: MenuCombo }) {
             ))}
           </div>
         )}
-        <span className="absolute top-2 left-2 text-xs px-2 py-0.5 rounded-full bg-black/60 text-white backdrop-blur-sm flex items-center gap-1">
+        <span className="absolute top-2.5 left-2.5 text-xs px-2 py-0.5 rounded-full bg-black/60 text-white backdrop-blur-sm flex items-center gap-1">
           <Layers className="w-3 h-3" /> Combo
         </span>
       </div>
 
       {/* Info */}
-      <div className="flex flex-col flex-1 p-3 gap-2">
+      <div className="flex flex-col flex-1 p-4 gap-3">
         <div>
-          <h3 className="font-semibold text-sm leading-tight">{combo.name}</h3>
+          <h3 className="font-semibold text-base leading-tight">{combo.name}</h3>
           {combo.description && (
-            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{combo.description}</p>
+            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{combo.description}</p>
           )}
           {comboProducts.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1.5">
+            <div className="flex flex-wrap gap-1 mt-2">
               {comboProducts.slice(0, 3).map((cp) => {
                 const prod = toSingle(cp.product);
                 return prod ? (
@@ -350,30 +409,30 @@ function ComboCard({ mc }: { mc: MenuCombo }) {
             </div>
           )}
         </div>
-        <div className="flex items-center justify-between mt-auto gap-2">
-          <span className="text-base font-bold text-primary">{formatCOP(combo.price)}</span>
+        <div className="flex flex-col items-start sm:flex-row sm:items-center justify-between mt-auto gap-2">
+          <span className="text-lg font-bold text-primary">{formatCOP(combo.price)}</span>
           {inCart ? (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => updateQty(cartId, inCart.quantity - 1)}
-                className="w-7 h-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"
+                className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"
               >
-                {inCart.quantity === 1 ? <Trash2 className="w-3 h-3 text-destructive" /> : <Minus className="w-3 h-3" />}
+                {inCart.quantity === 1 ? <Trash2 className="w-3.5 h-3.5 text-destructive" /> : <Minus className="w-3.5 h-3.5" />}
               </button>
-              <span className="text-sm font-bold w-5 text-center">{inCart.quantity}</span>
+              <span className="text-base font-bold w-5 text-center">{inCart.quantity}</span>
               <button
                 onClick={() => updateQty(cartId, inCart.quantity + 1)}
-                className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors"
+                className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors"
               >
-                <Plus className="w-3 h-3" />
+                <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : (
             <button
               onClick={handleAdd}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
             >
-              <Plus className="w-3 h-3" />
+              <Plus className="w-3.5 h-3.5" />
               Agregar
             </button>
           )}
@@ -390,11 +449,13 @@ export function MenuView({
   locationCtx,
   directions = [],
   allLocations = [],
+  isSocio = false,
 }: {
   menu: MenuData;
   locationCtx?: LocationCtx;
   directions?: DirectionItem[];
   allLocations?: { location_id: number; name: string; city: string | null }[];
+  isSocio?: boolean;
 }) {
   const [cartOpen, setCartOpen]             = useState(false);
   const [directionsOpen, setDirectionsOpen] = useState(false);
@@ -449,16 +510,13 @@ export function MenuView({
 
   const isFiltering = search.trim() !== "" || categoryFilter !== "all";
 
-  // Agrupar productos filtrados por type
+  // Agrupar productos filtrados por categoría
   const groups = new Map<string, MenuProduct[]>();
   for (const mp of filteredProducts) {
     if (!mp.product) continue;
-    const types = toArray(mp.product.product_has_type);
-    const keys  = types.length === 0 ? ["Otros"] : types.map((t) => t.type);
-    for (const key of keys) {
-      const existing = groups.get(key) ?? [];
-      groups.set(key, [...existing, mp]);
-    }
+    const key = toSingle(mp.product.category)?.name ?? "Otros";
+    const existing = groups.get(key) ?? [];
+    groups.set(key, [...existing, mp]);
   }
   const sortedGroups = [...groups.entries()].sort(([a], [b]) => {
     if (a === "Otros") return 1;
@@ -595,9 +653,7 @@ export function MenuView({
               <div className="flex-1 h-px bg-border" />
               <span className="text-xs text-muted-foreground">{items.length} item{items.length !== 1 ? "s" : ""}</span>
             </div>
-            <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-1 scrollbar-brand">
-              {items.map((mp) => <ProductCard key={mp.menu_product_id} mp={mp} />)}
-            </div>
+            <CardRow items={items.map((mp) => <ProductCard key={mp.menu_product_id} mp={mp} isSocio={isSocio} />)} />
           </section>
         ))}
 
@@ -611,9 +667,7 @@ export function MenuView({
               <div className="flex-1 h-px bg-border" />
               <span className="text-xs text-muted-foreground">{filteredCombos.length} combo{filteredCombos.length !== 1 ? "s" : ""}</span>
             </div>
-            <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-1 scrollbar-brand">
-              {filteredCombos.map((mc) => <ComboCard key={mc.menu_combo_id} mc={mc} />)}
-            </div>
+            <CardRow items={filteredCombos.map((mc) => <ComboCard key={mc.menu_combo_id} mc={mc} />)} />
           </section>
         )}
 

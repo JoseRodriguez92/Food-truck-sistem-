@@ -13,11 +13,18 @@ export async function searchCustomers(query: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")
-    .select("id, first_name, last_name, email")
+    .select("id, first_name, last_name, email, profile_has_role(roles(code))")
     .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%`)
     .limit(10);
 
-  return data ?? [];
+  return (data ?? []).map((p) => {
+    const roleRows = p.profile_has_role as unknown as { roles: { code: string } | { code: string }[] | null }[];
+    const isSocio = (roleRows ?? []).some((r) => {
+      const role = Array.isArray(r.roles) ? r.roles[0] : r.roles;
+      return role?.code === "socio";
+    });
+    return { id: p.id, first_name: p.first_name, last_name: p.last_name, email: p.email, isSocio };
+  });
 }
 
 // ─── Catálogo de productos/combos para armar el pedido ────────────────────────
@@ -26,7 +33,7 @@ export async function getCatalogForOrder() {
   const supabase = await createClient();
 
   const [{ data: products }, { data: combos }] = await Promise.all([
-    supabase.from("product").select("product_id, name, price").order("name"),
+    supabase.from("product").select("product_id, name, price, partner_price").order("name"),
     supabase.from("combo").select("combo_id, name, price").eq("active", true).order("name"),
   ]);
 
@@ -68,7 +75,7 @@ export async function getAccessibleLocations() {
   if (admin) {
     const { data } = await supabase
       .from("location")
-      .select("location_id, name, food_truck(name)")
+      .select("location_id, name, food_truck_id, food_truck(name)")
       .order("name");
     return data ?? [];
   }
@@ -82,7 +89,7 @@ export async function getAccessibleLocations() {
 
   const { data } = await supabase
     .from("location")
-    .select("location_id, name, food_truck(name)")
+    .select("location_id, name, food_truck_id, food_truck(name)")
     .in("food_truck_id", truckIds)
     .order("name");
   return data ?? [];
@@ -266,4 +273,48 @@ export async function updateManualOrder(input: {
 
   revalidatePath("/dashboard");
   return { success: true, orderNumber: order.order_number };
+}
+
+// ─── Eliminar pedido ────────────────────────────────────────────────────────
+
+export async function deleteOrder(profileOrderId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado" };
+
+  const admin = await isCurrentUserAdmin(supabase, user.id);
+  if (!admin) return { error: "Solo un admin puede eliminar pedidos" };
+
+  const { data: order } = await supabase
+    .from("profile_has_order")
+    .select("profile_order_id, stock_deducted")
+    .eq("profile_order_id", profileOrderId)
+    .single();
+  if (!order) return { error: "Pedido no encontrado" };
+
+  // Devolver stock si ya se había descontado, antes de borrar el pedido.
+  if (order.stock_deducted) {
+    const { error: restockErr } = await supabase.rpc("restock_order_stock", {
+      p_profile_order_id: profileOrderId,
+    });
+    if (restockErr) return { error: restockErr.message };
+  }
+
+  // El histórico de movimientos de inventario queda, solo se desvincula del pedido
+  // (ingredient_stock_movement.profile_order_id bloquea el delete si sigue apuntando).
+  await supabase
+    .from("ingredient_stock_movement")
+    .update({ profile_order_id: null })
+    .eq("profile_order_id", profileOrderId);
+
+  const { error: deleteErr } = await supabase
+    .from("profile_has_order")
+    .delete()
+    .eq("profile_order_id", profileOrderId);
+  if (deleteErr) return { error: deleteErr.message };
+
+  revalidatePath("/dashboard");
+  return { success: true };
 }

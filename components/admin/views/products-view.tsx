@@ -38,6 +38,7 @@ export type Product = {
   name: string;
   description: string | null;
   price: number;
+  partner_price: number | null;
   category_id: number | null;
   category: { category_id: number; name: string } | null;
   product_has_image: ProductImage[];
@@ -49,13 +50,14 @@ const schema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
   description: z.string().optional(),
   price: z.coerce.number().min(0, "Precio inválido"),
+  partnerPrice: z.coerce.number().min(0, "Precio socio inválido").optional().or(z.literal("")),
 });
 type FormValues = z.infer<typeof schema>;
 
 function ProductForm({ defaultValues, isPending }: { defaultValues?: Partial<FormValues>; isPending: boolean }) {
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: defaultValues ?? { name: "", description: "", price: 0 },
+    defaultValues: defaultValues ?? { name: "", description: "", price: 0, partnerPrice: "" },
   });
   return (
     <form id="product-form" className="space-y-4">
@@ -68,10 +70,17 @@ function ProductForm({ defaultValues, isPending }: { defaultValues?: Partial<For
         <Label htmlFor="p-desc">Descripción <span className="text-muted-foreground text-xs">(opcional)</span></Label>
         <Textarea id="p-desc" placeholder="Descripción del producto..." rows={2} {...register("description")} />
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="p-price">Precio (COP)</Label>
-        <Input id="p-price" type="number" step="0.01" min="0" placeholder="0.00" aria-invalid={!!errors.price} {...register("price")} />
-        {errors.price && <p className="text-xs text-destructive">{errors.price.message}</p>}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="p-price">Precio (COP)</Label>
+          <Input id="p-price" type="number" step="0.01" min="0" placeholder="0.00" aria-invalid={!!errors.price} {...register("price")} />
+          {errors.price && <p className="text-xs text-destructive">{errors.price.message}</p>}
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="p-partner-price">Precio socio <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+          <Input id="p-partner-price" type="number" step="0.01" min="0" placeholder="0.00" aria-invalid={!!errors.partnerPrice} {...register("partnerPrice")} />
+          {errors.partnerPrice && <p className="text-xs text-destructive">{errors.partnerPrice.message}</p>}
+        </div>
       </div>
     </form>
   );
@@ -594,7 +603,14 @@ function ProductCard({
         )}
 
         {/* Precio */}
-        <p className="text-base font-bold text-primary mt-auto">{formatCurrency(product.price)}</p>
+        <div className="mt-auto flex items-baseline gap-2">
+          <p className="text-base font-bold text-primary">{formatCurrency(product.price)}</p>
+          {product.partner_price != null && (
+            <p className="text-xs text-muted-foreground">
+              <span className="text-[10px] uppercase tracking-wide">Socio</span> {formatCurrency(product.partner_price)}
+            </p>
+          )}
+        </div>
 
         {/* Acciones */}
         <TooltipProvider delayDuration={300}>
@@ -777,7 +793,12 @@ export function ProductsView({ products, allIngredients, allCategories }: { prod
                   <TableCell className="text-muted-foreground font-mono text-sm">{p.product_id}</TableCell>
                   <TableCell className="font-medium">{p.name}</TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-48 truncate">{p.description ?? "—"}</TableCell>
-                  <TableCell className="font-medium text-sm">{formatCurrency(p.price)}</TableCell>
+                  <TableCell className="font-medium text-sm">
+                    {formatCurrency(p.price)}
+                    {p.partner_price != null && (
+                      <p className="text-xs font-normal text-muted-foreground">Socio {formatCurrency(p.partner_price)}</p>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {p.category ? (
                       <Badge
@@ -912,7 +933,17 @@ export function ProductsView({ products, allIngredients, allCategories }: { prod
       <Dialog open={!!editProduct} onOpenChange={(o) => !o && setEditProduct(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Editar producto</DialogTitle></DialogHeader>
-          {editProduct && <ProductForm defaultValues={{ name: editProduct.name, description: editProduct.description ?? "", price: editProduct.price }} isPending={isPending} />}
+          {editProduct && (
+            <ProductForm
+              defaultValues={{
+                name: editProduct.name,
+                description: editProduct.description ?? "",
+                price: editProduct.price,
+                partnerPrice: editProduct.partner_price ?? "",
+              }}
+              isPending={isPending}
+            />
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditProduct(null)}>Cancelar</Button>
             <Button disabled={isPending} onClick={() => {

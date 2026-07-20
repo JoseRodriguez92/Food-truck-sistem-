@@ -17,7 +17,7 @@ export default async function ClientLayout({ children }: { children: React.React
   return (
     <div className="flex min-h-screen bg-background">
       <ClientSidebar profile={profile} />
-      <main className="flex-1 lg:ml-60 pt-14 lg:pt-0 min-h-screen">
+      <main className="flex-1 min-w-0 lg:ml-60 pt-14 lg:pt-0 min-h-screen">
         {children}
       </main>
     </div>

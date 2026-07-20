@@ -31,8 +31,8 @@ import {
   createManualOrder,
 } from "@/app/dashboard/orders-actions";
 
-type Customer = { id: string; first_name: string | null; last_name: string | null; email: string | null };
-type CatalogItem = { id: number; name: string; price: number; type: "product" | "combo" };
+type Customer = { id: string; first_name: string | null; last_name: string | null; email: string | null; isSocio: boolean };
+type CatalogItem = { id: number; name: string; price: number; partnerPrice: number | null; type: "product" | "combo" };
 type CartLine = CatalogItem & { quantity: number };
 type LocationOption = { location_id: number; name: string; food_truck: { name: string } | { name: string }[] | null };
 
@@ -42,6 +42,10 @@ function formatCurrency(amount: number) {
     currency: "COP",
     maximumFractionDigits: 0,
   }).format(amount);
+}
+
+function effectivePrice(item: CatalogItem, isPartnerPrice: boolean) {
+  return isPartnerPrice && item.partnerPrice != null ? item.partnerPrice : item.price;
 }
 
 export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
@@ -70,13 +74,16 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
   const [isCourtesy, setIsCourtesy] = useState(false);
   const [courtesyReason, setCourtesyReason] = useState("");
 
+  // Se cobra precio socio automáticamente cuando el cliente registrado elegido tiene ese rol.
+  const isPartnerPrice = !!selectedCustomer?.isSocio;
+
   useEffect(() => {
     if (!open) return;
     setCatalogLoading(true);
     getCatalogForOrder().then(({ products, combos }) => {
       setCatalog([
-        ...products.map((p) => ({ id: p.product_id, name: p.name, price: p.price, type: "product" as const })),
-        ...combos.map((c) => ({ id: c.combo_id, name: c.name, price: c.price, type: "combo" as const })),
+        ...products.map((p) => ({ id: p.product_id, name: p.name, price: p.price, partnerPrice: p.partner_price, type: "product" as const })),
+        ...combos.map((c) => ({ id: c.combo_id, name: c.name, price: c.price, partnerPrice: null, type: "combo" as const })),
       ]);
       setCatalogLoading(false);
     });
@@ -140,7 +147,7 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
     return catalog.filter((c) => c.name.toLowerCase().includes(q));
   }, [catalog, catalogQuery]);
 
-  const total = cart.reduce((acc, l) => acc + l.price * l.quantity, 0);
+  const total = cart.reduce((acc, l) => acc + effectivePrice(l, isPartnerPrice) * l.quantity, 0);
 
   function handleSubmit() {
     if (!locationId) {
@@ -162,7 +169,7 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
         notes,
         isCourtesy,
         courtesyReason,
-        items: cart.map((l) => ({ type: l.type, itemId: l.id, name: l.name, price: l.price, quantity: l.quantity })),
+        items: cart.map((l) => ({ type: l.type, itemId: l.id, name: l.name, price: effectivePrice(l, isPartnerPrice), quantity: l.quantity })),
       });
       if ("error" in result) {
         toast.error(result.error);
@@ -176,7 +183,7 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) resetAll(); onOpenChange(o); }}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
+      <DialogContent className="sm:max-w-[90dvw] max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Nuevo pedido</DialogTitle>
         </DialogHeader>
@@ -232,9 +239,16 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
                 {selectedCustomer ? (
                   <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
                     <div>
-                      <p className="text-sm font-medium">
-                        {selectedCustomer.first_name} {selectedCustomer.last_name ?? ""}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium">
+                          {selectedCustomer.first_name} {selectedCustomer.last_name ?? ""}
+                        </p>
+                        {selectedCustomer.isSocio && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                            Socio
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">{selectedCustomer.email}</p>
                     </div>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedCustomer(null)}>
@@ -265,7 +279,14 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
                               className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors"
                               onClick={() => { setSelectedCustomer(c); setCustomerQuery(""); setCustomerResults([]); }}
                             >
-                              <p className="font-medium">{c.first_name} {c.last_name ?? ""}</p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-medium">{c.first_name} {c.last_name ?? ""}</p>
+                                {c.isSocio && (
+                                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                                    Socio
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-xs text-muted-foreground">{c.email}</p>
                             </button>
                           ))
@@ -312,7 +333,9 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
                             <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                             <span className="text-sm truncate">{item.name}</span>
                           </div>
-                          <span className="text-xs text-muted-foreground shrink-0">{formatCurrency(item.price)}</span>
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {formatCurrency(effectivePrice(item, isPartnerPrice))}
+                          </span>
                         </button>
                       );
                     })}
@@ -332,7 +355,7 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
                       <div key={`${line.type}-${line.id}`} className="flex items-center justify-between gap-2 px-3 py-2">
                         <div className="min-w-0">
                           <p className="text-sm truncate">{line.name}</p>
-                          <p className="text-xs text-muted-foreground">{formatCurrency(line.price)} c/u</p>
+                          <p className="text-xs text-muted-foreground">{formatCurrency(effectivePrice(line, isPartnerPrice))} c/u</p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => changeQty(line, -1)}>
@@ -382,9 +405,16 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
         </div>
 
         <DialogFooter className={cn("flex items-center border-t border-border pt-4", "sm:justify-between")}>
-          <span className="text-sm font-semibold">
-            Total: {isCourtesy ? formatCurrency(0) : formatCurrency(total)}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold">
+              Total: {isCourtesy ? formatCurrency(0) : formatCurrency(total)}
+            </span>
+            {isPartnerPrice && !isCourtesy && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                Precio socio
+              </span>
+            )}
+          </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={isPending || cart.length === 0}>

@@ -92,21 +92,30 @@ export default async function ClientMenuPage({
   // ── Directions del usuario autenticado ────────────────────────────────────
   const { data: { user } } = await supabase.auth.getUser();
   let directions: DirectionItem[] = [];
+  let isSocio = false;
   if (user) {
-    const { data } = await supabase
-      .from("profile_has_direction")
-      .select(`
-        profile_direction_id, is_default,
-        direction(direction_id, label, address_line, city, state, country, postal_code, additional_info)
-      `)
-      .eq("profile_id", user.id)
-      .order("profile_direction_id");
+    const [{ data }, { data: roleRows }] = await Promise.all([
+      supabase
+        .from("profile_has_direction")
+        .select(`
+          profile_direction_id, is_default,
+          direction(direction_id, label, address_line, city, state, country, postal_code, additional_info)
+        `)
+        .eq("profile_id", user.id)
+        .order("profile_direction_id"),
+      supabase.from("profile_has_role").select("roles(code)").eq("profile_id", user.id),
+    ]);
     directions = (data ?? []) as unknown as DirectionItem[];
+    isSocio = (roleRows ?? []).some((r) => {
+      const roles = r.roles as unknown as { code: string } | { code: string }[] | null;
+      const role = Array.isArray(roles) ? roles[0] : roles;
+      return role?.code === "socio";
+    });
   }
 
   // ── Modo directo por menu_id ───────────────────────────────────────────────
   if (directMenuId && !locationId) {
-    return fetchAndRenderMenu(supabase, directMenuId, undefined, directions, allLocations ?? []);
+    return fetchAndRenderMenu(supabase, directMenuId, undefined, directions, allLocations ?? [], isSocio);
   }
 
   // ── Sin ubicación en la URL: reusar la detección automática de /client ──────
@@ -166,7 +175,7 @@ export default async function ClientMenuPage({
     locationId,
     menus: assignedMenus,
     activeMenuId: targetMenuId,
-  }, directions, allLocations ?? []);
+  }, directions, allLocations ?? [], isSocio);
 }
 
 // ── Helper ─────────────────────────────────────────────────────────────────────
@@ -181,7 +190,8 @@ async function fetchAndRenderMenu(
     activeMenuId: number;
   } | undefined,
   directions: DirectionItem[],
-  allLocations: { location_id: number; name: string; city: string | null }[]
+  allLocations: { location_id: number; name: string; city: string | null }[],
+  isSocio: boolean
 ) {
   const [{ data: menuBase }, { data: menuProducts }, { data: menuCombos }] = await Promise.all([
     supabase
@@ -195,7 +205,7 @@ async function fetchAndRenderMenu(
       .select(`
         menu_product_id, product_id,
         product(
-          product_id, name, description, price,
+          product_id, name, description, price, partner_price,
           product_has_type(product_type_id, type),
           product_has_image(product_image_id, image_url),
           category(category_id, name)
@@ -237,5 +247,5 @@ async function fetchAndRenderMenu(
     menu_has_combo:   menuCombos   ?? [],
   };
 
-  return <MenuView menu={menu as never} locationCtx={locationCtx} directions={directions} allLocations={allLocations} />;
+  return <MenuView menu={menu as never} locationCtx={locationCtx} directions={directions} allLocations={allLocations} isSocio={isSocio} />;
 }

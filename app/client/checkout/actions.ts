@@ -33,10 +33,42 @@ export async function createOrder(
     .single();
   if (!statusPending) return { error: "Estado 'pending' no encontrado" };
 
-  // 2. Calcular totales
-  const subtotal = items.reduce((acc, i) => acc + i.price * i.quantity, 0);
+  // 2. ¿El cliente es socio? Si lo es, se cobra partner_price en vez de price.
+  //    El precio nunca se confía del carrito del cliente — siempre se recalcula
+  //    server-side contra la DB para que no se pueda manipular desde localStorage.
+  const { data: roleRows } = await supabase.from("profile_has_role").select("roles(code)").eq("profile_id", user.id);
+  const isSocio = (roleRows ?? []).some((r) => {
+    const roles = r.roles as unknown as { code: string } | { code: string }[] | null;
+    const role = Array.isArray(roles) ? roles[0] : roles;
+    return role?.code === "socio";
+  });
 
-  // 3. Crear profile_has_order
+  const productIds = items.filter((i) => i.type === "product").map((i) => i.itemId);
+  const comboIds = items.filter((i) => i.type === "combo").map((i) => i.itemId);
+
+  const [{ data: products }, { data: combos }] = await Promise.all([
+    productIds.length
+      ? supabase.from("product").select("product_id, price, partner_price").in("product_id", productIds)
+      : Promise.resolve({ data: [] as { product_id: number; price: number; partner_price: number | null }[] }),
+    comboIds.length
+      ? supabase.from("combo").select("combo_id, price").in("combo_id", comboIds)
+      : Promise.resolve({ data: [] as { combo_id: number; price: number }[] }),
+  ]);
+
+  const productPrice = new Map((products ?? []).map((p) => [p.product_id, isSocio && p.partner_price != null ? p.partner_price : p.price]));
+  const comboPrice = new Map((combos ?? []).map((c) => [c.combo_id, c.price]));
+
+  const resolvedItems = items.map((item) => {
+    const unitPrice = item.type === "product" ? productPrice.get(item.itemId) : comboPrice.get(item.itemId);
+    return { ...item, quantity: Math.max(1, Math.floor(item.quantity)), unitPrice };
+  });
+  const invalidItem = resolvedItems.find((i) => i.unitPrice === undefined);
+  if (invalidItem) return { error: `"${invalidItem.name}" ya no está disponible` };
+
+  // 3. Calcular totales
+  const subtotal = resolvedItems.reduce((acc, i) => acc + i.unitPrice! * i.quantity, 0);
+
+  // 4. Crear profile_has_order
   const { data: order, error: orderErr } = await supabase
     .from("profile_has_order")
     .insert({
@@ -50,19 +82,19 @@ export async function createOrder(
     .single();
   if (orderErr || !order) return { error: orderErr?.message ?? "Error creando orden" };
 
-  // 4. Crear order_detail por cada item
-  const details = items.map((item) => ({
+  // 5. Crear order_detail por cada item
+  const details = resolvedItems.map((item) => ({
     profile_order_id: order.profile_order_id,
     product_id:       item.type === "product" ? item.itemId : null,
     combo_id:         item.type === "combo"   ? item.itemId : null,
     quantity:         item.quantity,
-    unit_price:       item.price,
-    line_total:       item.price * item.quantity,
+    unit_price:       item.unitPrice!,
+    line_total:       item.unitPrice! * item.quantity,
   }));
   const { error: detailErr } = await supabase.from("order_detail").insert(details);
   if (detailErr) return { error: detailErr.message };
 
-  // 5. Registrar en historial de estados
+  // 6. Registrar en historial de estados
   await supabase.from("order_has_status").insert({
     profile_order_id: order.profile_order_id,
     status_order_id:  statusPending.status_order_id,

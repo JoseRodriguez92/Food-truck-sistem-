@@ -9,6 +9,16 @@ const roleSchema = z.object({
   description: z.string().optional(),
 });
 
+function slugifyCode(name: string) {
+  return name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 export async function createRole(formData: FormData) {
   const parsed = roleSchema.safeParse({
     name: formData.get("name"),
@@ -17,8 +27,13 @@ export async function createRole(formData: FormData) {
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("roles").insert(parsed.data);
-  if (error) return { error: error.message };
+  const { error } = await supabase
+    .from("roles")
+    .insert({ ...parsed.data, code: slugifyCode(parsed.data.name) });
+  if (error) {
+    if (error.code === "23505") return { error: "Ya existe un rol con ese nombre" };
+    return { error: error.message };
+  }
   revalidatePath("/dashboard");
 }
 
@@ -34,7 +49,10 @@ export async function updateRole(roleId: string, formData: FormData) {
     .from("roles")
     .update(parsed.data)
     .eq("role_id", roleId);
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.code === "23505") return { error: "Ya existe un rol con ese nombre" };
+    return { error: error.message };
+  }
   revalidatePath("/dashboard");
 }
 

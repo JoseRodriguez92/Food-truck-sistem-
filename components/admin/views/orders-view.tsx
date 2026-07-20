@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, ShoppingBag, Package, Layers, Plus, Minus, MapPin, Pencil, Loader2 } from "lucide-react";
+import { Search, X, ShoppingBag, Package, Layers, Plus, Minus, MapPin, Pencil, Loader2, Trash2, Store } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -14,10 +14,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { OrderStatusSelect } from "@/components/admin/order-status-select";
 import { SectionHeader } from "@/components/admin/section-header";
 import { CreateOrderDialog } from "@/components/admin/create-order-dialog";
-import { getCatalogForOrder, updateManualOrder } from "@/app/dashboard/orders-actions";
+import { getCatalogForOrder, updateManualOrder, deleteOrder } from "@/app/dashboard/orders-actions";
+import { useSelectedTruckStore } from "@/lib/store/selected-truck";
 
 // ============================================================
 // TIPOS
@@ -48,6 +60,7 @@ type OrderDetailLine = {
 export type LocationOption = {
   location_id: number;
   name: string;
+  food_truck_id: number;
   food_truck: { name: string } | { name: string }[] | null;
 };
 
@@ -59,6 +72,7 @@ export type OrderRow = {
   discount_total: number;
   is_courtesy: boolean;
   courtesy_reason: string | null;
+  stock_deducted: boolean;
   created_at: string;
   notes: string | null;
   status_order_id: string | null;
@@ -71,7 +85,6 @@ export type OrderRow = {
 
 export type OrdersFilters = {
   status: string;
-  location: string;
   q: string;
   from: string;
   to: string;
@@ -147,7 +160,6 @@ function toEditableLines(order: OrderRow): EditableLine[] {
 export function OrdersView({
   orders,
   allStatuses,
-  allLocations,
   filters,
   page,
   totalPages,
@@ -156,7 +168,6 @@ export function OrdersView({
 }: {
   orders: OrderRow[];
   allStatuses: OrderStatus[];
-  allLocations: LocationOption[];
   filters: OrdersFilters;
   page: number;
   totalPages: number;
@@ -164,12 +175,23 @@ export function OrdersView({
   loadError?: string | null;
 }) {
   const router = useRouter();
+  const selectedTruck = useSelectedTruckStore((s) => s.selectedTruck);
 
   const [q, setQ] = useState(filters.q);
   const [status, setStatus] = useState(filters.status || "all");
-  const [location, setLocation] = useState(filters.location || "all");
   const [from, setFrom] = useState(filters.from);
   const [to, setTo] = useState(filters.to);
+
+  // El truck del sidebar manda: los pedidos que se ven acá son SIEMPRE los de
+  // ese truck. Cuando cambia, se refleja en la URL (?truck=) para que el server filtre.
+  const lastSyncedTruck = useRef(selectedTruck);
+  useEffect(() => {
+    if (selectedTruck === lastSyncedTruck.current) return;
+    lastSyncedTruck.current = selectedTruck;
+    if (selectedTruck == null) return;
+    navigate({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTruck]);
   const [detailOrder, setDetailOrder] = useState<OrderRow | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -181,6 +203,22 @@ export function OrdersView({
   const [catalogQuery, setCatalogQuery] = useState("");
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [isSaving, startSaving] = useTransition();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [, startDeleting] = useTransition();
+
+  function handleDelete(orderNumber: number, profileOrderId: string) {
+    setDeletingId(profileOrderId);
+    startDeleting(async () => {
+      const result = await deleteOrder(profileOrderId);
+      setDeletingId(null);
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(`Pedido #${orderNumber} eliminado`);
+      router.refresh();
+    });
+  }
 
   useEffect(() => {
     if (!isEditing || !detailOrder) return;
@@ -313,18 +351,17 @@ export function OrdersView({
   const hasActiveFilters = !!(
     filters.q ||
     (filters.status && filters.status !== "all") ||
-    (filters.location && filters.location !== "all") ||
     filters.from ||
     filters.to
   );
 
   function navigate(
-    overrides: Partial<{ status: string; location: string; q: string; from: string; to: string; page: number }> = {},
+    overrides: Partial<{ status: string; q: string; from: string; to: string; page: number }> = {},
   ) {
-    const next = { status, location, q, from, to, page: 1, ...overrides };
+    const next = { status, q, from, to, page: 1, ...overrides };
     const params = new URLSearchParams({ section: "orders" });
+    if (selectedTruck) params.set("truck", String(selectedTruck));
     if (next.status && next.status !== "all") params.set("status", next.status);
-    if (next.location && next.location !== "all") params.set("location", next.location);
     if (next.q) params.set("q", next.q);
     if (next.from) params.set("from", next.from);
     if (next.to) params.set("to", next.to);
@@ -335,10 +372,11 @@ export function OrdersView({
   function clearFilters() {
     setQ("");
     setStatus("all");
-    setLocation("all");
     setFrom("");
     setTo("");
-    router.push("/dashboard?section=orders");
+    const params = new URLSearchParams({ section: "orders" });
+    if (selectedTruck) params.set("truck", String(selectedTruck));
+    router.push(`/dashboard?${params.toString()}`);
   }
 
   return (
@@ -355,7 +393,7 @@ export function OrdersView({
 
       {/* Filtros */}
       <div className="rounded-xl border border-border p-4 space-y-3">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <Input
@@ -376,21 +414,6 @@ export function OrdersView({
               {allStatuses.map((s) => (
                 <SelectItem key={s.status_order_id} value={s.status_order_id}>
                   {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={location} onValueChange={(v) => { setLocation(v); navigate({ location: v }); }}>
-            <SelectTrigger className="w-full">
-              <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              <SelectValue placeholder="Ubicación" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las ubicaciones</SelectItem>
-              {allLocations.map((l) => (
-                <SelectItem key={l.location_id} value={String(l.location_id)}>
-                  {locationLabel(l)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -448,6 +471,7 @@ export function OrdersView({
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="w-24 text-right">Detalle</TableHead>
+                  <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -457,15 +481,23 @@ export function OrdersView({
                   const orderLocation = one(order.location);
                   const customerName = profile?.first_name
                     ? `${profile.first_name} ${profile.last_name ?? ""}`.trim()
-                    : (profile?.email ?? "—");
+                    : profile?.email;
 
                   return (
                     <TableRow key={order.profile_order_id}>
                       <TableCell className="font-mono font-medium text-sm">#{order.order_number}</TableCell>
                       <TableCell>
-                        <p className="text-sm font-medium">{customerName}</p>
-                        {profile?.email && (
-                          <p className="text-xs text-muted-foreground hidden sm:block">{profile.email}</p>
+                        {customerName ? (
+                          <>
+                            <p className="text-sm font-medium">{customerName}</p>
+                            {profile?.email && (
+                              <p className="text-xs text-muted-foreground hidden sm:block">{profile.email}</p>
+                            )}
+                          </>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">
+                            <Store className="w-3 h-3" /> Mostrador
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
@@ -502,6 +534,43 @@ export function OrdersView({
                         <Button variant="ghost" size="sm" onClick={() => openDetail(order)}>
                           Ver
                         </Button>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              disabled={deletingId === order.profile_order_id}
+                            >
+                              {deletingId === order.profile_order_id ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="size-4" />
+                              )}
+                              <span className="sr-only">Eliminar pedido #{order.order_number}</span>
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Eliminar pedido #{order.order_number}?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta acción no se puede deshacer. Se borra el pedido, sus líneas y su historial de estado
+                                {order.stock_deducted ? ", y se devuelve el stock descontado." : "."}
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive text-white hover:bg-destructive/90"
+                                onClick={() => handleDelete(order.order_number, order.profile_order_id)}
+                              >
+                                Eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </TableCell>
                     </TableRow>
                   );

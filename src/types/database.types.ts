@@ -1109,6 +1109,7 @@ export type Database = {
           category_id: number | null
           description: string | null
           name: string
+          partner_price: number | null
           price: number
           product_id: number
         }
@@ -1116,6 +1117,7 @@ export type Database = {
           category_id?: number | null
           description?: string | null
           name: string
+          partner_price?: number | null
           price?: number
           product_id?: never
         }
@@ -1123,6 +1125,7 @@ export type Database = {
           category_id?: number | null
           description?: string | null
           name?: string
+          partner_price?: number | null
           price?: number
           product_id?: never
         }

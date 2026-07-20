@@ -19,17 +19,19 @@ export default async function DashboardLayout({
 
   if (!user) redirect("/login");
 
-  // Verificar rol
-  const { data: roleData } = await supabase
+  // Verificar rol — un usuario puede tener varios roles, alcanza con que uno sea admin/employ
+  const { data: roleRows } = await supabase
     .from("profile_has_role")
     .select("roles(name)")
-    .eq("profile_id", user.id)
-    .limit(1)
-    .single();
+    .eq("profile_id", user.id);
 
-  const rolesRaw = roleData?.roles as unknown as { name: string } | { name: string }[] | null;
-  const roleName = (Array.isArray(rolesRaw) ? rolesRaw[0] : rolesRaw)?.name?.toLowerCase();
-  if (roleName !== "admin" && roleName !== "employ") redirect("/menu");
+  const hasAccess = (roleRows ?? []).some((r) => {
+    const roles = r.roles as unknown as { name: string } | { name: string }[] | null;
+    const role = Array.isArray(roles) ? roles[0] : roles;
+    const code = role?.name?.toLowerCase();
+    return code === "admin" || code === "employ";
+  });
+  if (!hasAccess) redirect("/client");
 
   // Perfil del usuario
   const { data: profile } = await supabase

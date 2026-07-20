@@ -33,7 +33,7 @@ export default async function DashboardPage({
   searchParams: Promise<{
     section?: string;
     status?: string;
-    location?: string;
+    truck?: string;
     q?: string;
     from?: string;
     to?: string;
@@ -86,7 +86,7 @@ export default async function DashboardPage({
       const from = params.from || "";
       const to = params.to || "";
 
-      const locationFilter = params.location || "all";
+      const truckFilter = params.truck ? Number(params.truck) : null;
 
       const [{ data: allStatuses }, allLocations] = await Promise.all([
         supabase
@@ -97,11 +97,16 @@ export default async function DashboardPage({
         getAccessibleLocations(),
       ]);
 
+      // Truck activo en el sidebar → limita los pedidos a las ubicaciones de ese truck.
+      const truckLocationIds = truckFilter
+        ? (allLocations ?? []).filter((l) => l.food_truck_id === truckFilter).map((l) => l.location_id)
+        : null;
+
       let query = supabase
         .from("profile_has_order")
         .select(
           `
-          profile_order_id, order_number, total, subtotal, discount_total, is_courtesy, courtesy_reason, created_at, notes, status_order_id, location_id,
+          profile_order_id, order_number, total, subtotal, discount_total, is_courtesy, courtesy_reason, created_at, notes, status_order_id, location_id, stock_deducted,
           profiles!profile_has_order_profile_id_fkey(first_name, last_name, email),
           status_order(status_order_id, name, code, sort_order),
           location(location_id, name, food_truck(name)),
@@ -116,7 +121,7 @@ export default async function DashboardPage({
         .order("created_at", { ascending: false });
 
       if (statusFilter !== "all") query = query.eq("status_order_id", statusFilter);
-      if (locationFilter !== "all") query = query.eq("location_id", Number(locationFilter));
+      if (truckLocationIds) query = query.in("location_id", truckLocationIds.length ? truckLocationIds : [-1]);
       if (from) query = query.gte("created_at", new Date(`${from}T00:00:00`).toISOString());
       if (to) query = query.lte("created_at", new Date(`${to}T23:59:59`).toISOString());
 
@@ -155,7 +160,7 @@ export default async function DashboardPage({
           .from("profile_has_order")
           .select(
             `
-            profile_order_id, order_number, total, subtotal, created_at, notes, status_order_id, location_id,
+            profile_order_id, order_number, total, subtotal, created_at, notes, status_order_id, location_id, stock_deducted,
             profiles!profile_has_order_profile_id_fkey(first_name, last_name, email),
             status_order(status_order_id, name, code, sort_order),
             location(location_id, name, food_truck(name)),
@@ -170,7 +175,7 @@ export default async function DashboardPage({
           .order("created_at", { ascending: false });
 
         if (statusFilter !== "all") legacyQuery.eq("status_order_id", statusFilter);
-        if (locationFilter !== "all") legacyQuery.eq("location_id", Number(locationFilter));
+        if (truckLocationIds) legacyQuery.in("location_id", truckLocationIds.length ? truckLocationIds : [-1]);
         if (from) legacyQuery.gte("created_at", new Date(`${from}T00:00:00`).toISOString());
         if (to) legacyQuery.lte("created_at", new Date(`${to}T23:59:59`).toISOString());
 
@@ -219,8 +224,7 @@ export default async function DashboardPage({
         <OrdersView
           orders={(orders ?? []) as never}
           allStatuses={allStatuses ?? []}
-          allLocations={(allLocations ?? []) as never}
-          filters={{ status: statusFilter, location: locationFilter, q: params.q || "", from, to }}
+          filters={{ status: statusFilter, q: params.q || "", from, to }}
           page={page}
           totalPages={totalPages}
           totalCount={totalCount}
@@ -390,7 +394,7 @@ export default async function DashboardPage({
           .from("product")
           .select(
             `
-            product_id, name, description, price, category_id,
+            product_id, name, description, price, partner_price, category_id,
             category(category_id, name),
             product_has_image(product_image_id, image_url),
             product_has_type(product_type_id, type),
