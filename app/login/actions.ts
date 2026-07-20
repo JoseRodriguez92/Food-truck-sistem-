@@ -17,38 +17,51 @@ function adminClient() {
 }
 
 export async function login(formData: FormData) {
-  const supabase = await createClient();
+  try {
+    const supabase = await createClient();
 
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-  const redirectTo = formData.get("redirect") as string | null;
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    const redirectTo = formData.get("redirect") as string | null;
 
-  const { data: authData, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-  if (error) {
-    return { error: error.message };
+    if (error) {
+      return { error: error.message };
+    }
+
+    // Si por alguna razon no viene usuario, devolvemos error controlado.
+    if (!authData.user?.id) {
+      return { error: "No se pudo iniciar sesion. Intenta nuevamente." };
+    }
+
+    // Consultar el rol del usuario sin lanzar error si no hay fila.
+    const { data: roleData } = await supabase
+      .from("profile_has_role")
+      .select("roles(name)")
+      .eq("profile_id", authData.user.id)
+      .limit(1)
+      .maybeSingle();
+
+    const rolesRaw = roleData?.roles as unknown as { name: string } | { name: string }[] | null;
+    const roleName = (Array.isArray(rolesRaw) ? rolesRaw[0] : rolesRaw)?.name ?? "customer";
+
+    // Si venia de un flujo con retorno explicito (ej. guest checkout), respetarlo.
+    const destination =
+      redirectTo && redirectTo.startsWith("/") ? redirectTo : getRedirectByRole(roleName);
+
+    revalidatePath("/", "layout");
+    return { redirect: destination };
+  } catch (err) {
+    console.error("[login] unexpected error", err);
+    return {
+      error:
+        "Error temporal del servidor al iniciar sesion. Intenta de nuevo en unos segundos.",
+    };
   }
-
-  // Consultar el rol del usuario
-  const { data: roleData } = await supabase
-    .from("profile_has_role")
-    .select("roles(name)")
-    .eq("profile_id", authData.user.id)
-    .limit(1)
-    .single();
-
-  const rolesRaw = roleData?.roles as unknown as { name: string } | { name: string }[] | null;
-  const roleName = (Array.isArray(rolesRaw) ? rolesRaw[0] : rolesRaw)?.name ?? "customer";
-
-  // Si venía de un flujo con retorno explícito (ej. guest checkout), respetarlo.
-  const destination =
-    redirectTo && redirectTo.startsWith("/") ? redirectTo : getRedirectByRole(roleName);
-
-  revalidatePath("/", "layout");
-  return { redirect: destination };
 }
 
 export async function register(

@@ -10,6 +10,8 @@ import {
   Pencil,
   Trash2,
   Leaf,
+  Search,
+  X,
   FlaskConical,
   PackagePlus,
   History,
@@ -211,6 +213,7 @@ export function IngredientsView({
   >([]);
   const [createUnit, setCreateUnit] = useState("gr");
   const [editUnit, setEditUnit] = useState("gr");
+  const [search, setSearch] = useState("");
 
   // Fetch stock para truck seleccionado
   useEffect(() => {
@@ -281,11 +284,18 @@ export function IngredientsView({
     });
   }
 
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredIngredients = normalizedSearch
+    ? ingredientsWithStock.filter((ing) =>
+        ing.name.toLowerCase().includes(normalizedSearch),
+      )
+    : ingredientsWithStock;
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       <SectionHeader
         title="Ingredientes"
-        subtitle={`${ingredientsWithStock.length} ingrediente${ingredientsWithStock.length !== 1 ? "s" : ""} registrado${ingredientsWithStock.length !== 1 ? "s" : ""}`}
+        subtitle={`${filteredIngredients.length} ingrediente${filteredIngredients.length !== 1 ? "s" : ""} ${normalizedSearch ? "encontrado" : "registrado"}${filteredIngredients.length !== 1 ? "s" : ""}`}
         actions={
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <div className="flex items-center gap-2 bg-transparent shadow-lg shadow-primary/30 ring-2 ring-primary/20 border border-primary/30 rounded-lg px-3 py-2 cursor-pointer">
@@ -323,20 +333,58 @@ export function IngredientsView({
         }
       />
 
+      <div className="rounded-xl border border-border p-3">
+        <div className="relative max-w-xl">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nombre de ingrediente..."
+            className="pl-8 pr-9"
+          />
+          {search && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground hover:text-foreground"
+              onClick={() => setSearch("")}
+            >
+              <X className="w-3.5 h-3.5" />
+            </Button>
+          )}
+        </div>
+      </div>
+
       {/* Tabla */}
       <div className="rounded-xl border border-border overflow-hidden">
-        {ingredientsWithStock.length === 0 ? (
+        {filteredIngredients.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
             <Leaf className="w-10 h-10 opacity-20" />
-            <p className="text-sm">Sin ingredientes registrados</p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCreateOpen(true)}
-              className="gap-2"
-            >
-              <Plus className="w-3.5 h-3.5" /> Agregar primero
-            </Button>
+            <p className="text-sm">
+              {ingredientsWithStock.length === 0
+                ? "Sin ingredientes registrados"
+                : "Sin resultados para esta busqueda"}
+            </p>
+            {ingredientsWithStock.length === 0 ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCreateOpen(true)}
+                className="gap-2"
+              >
+                <Plus className="w-3.5 h-3.5" /> Agregar primero
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSearch("")}
+                className="gap-2"
+              >
+                <X className="w-3.5 h-3.5" /> Limpiar busqueda
+              </Button>
+            )}
           </div>
         ) : (
           <Table>
@@ -353,7 +401,7 @@ export function IngredientsView({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {ingredientsWithStock.map((ing) => (
+              {filteredIngredients.map((ing) => (
                 <TableRow key={ing.ingredient_id}>
                   <TableCell className="text-muted-foreground font-mono text-sm">
                     {ing.ingredient_id}

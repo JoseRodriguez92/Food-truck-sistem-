@@ -60,7 +60,7 @@ export default async function DashboardPage({
           created_at,
           notes,
           status_order_id,
-          profiles(first_name, last_name, email),
+          profiles!profile_has_order_profile_id_fkey(first_name, last_name, email),
           status_order(status_order_id, name, code, sort_order)
         `,
         )
@@ -100,8 +100,8 @@ export default async function DashboardPage({
         .from("profile_has_order")
         .select(
           `
-          profile_order_id, order_number, total, subtotal, created_at, notes, status_order_id, location_id,
-          profiles(first_name, last_name, email),
+          profile_order_id, order_number, total, subtotal, discount_total, is_courtesy, courtesy_reason, created_at, notes, status_order_id, location_id,
+          profiles!profile_has_order_profile_id_fkey(first_name, last_name, email),
           status_order(status_order_id, name, code, sort_order),
           location(location_id, name, food_truck(name)),
           order_detail(
@@ -139,7 +139,77 @@ export default async function DashboardPage({
 
       const rangeFrom = (page - 1) * PAGE_SIZE;
       const rangeTo = rangeFrom + PAGE_SIZE - 1;
-      const { data: orders, count } = await query.range(rangeFrom, rangeTo);
+
+      let orders: any[] | null = null;
+      let count = 0;
+      let loadError: string | null = null;
+
+      const { data, count: queriedCount, error } = await query.range(rangeFrom, rangeTo);
+      orders = data;
+      count = queriedCount ?? 0;
+
+      // Compatibilidad: si la migracion de cortesia aun no existe, volvemos a la consulta legacy.
+      if (error) {
+        const legacyQuery = supabase
+          .from("profile_has_order")
+          .select(
+            `
+            profile_order_id, order_number, total, subtotal, created_at, notes, status_order_id, location_id,
+            profiles!profile_has_order_profile_id_fkey(first_name, last_name, email),
+            status_order(status_order_id, name, code, sort_order),
+            location(location_id, name, food_truck(name)),
+            order_detail(
+              order_detail_id, quantity, unit_price, line_total,
+              product(product_id, name),
+              combo(combo_id, name)
+            )
+          `,
+            { count: "exact" },
+          )
+          .order("created_at", { ascending: false });
+
+        if (statusFilter !== "all") legacyQuery.eq("status_order_id", statusFilter);
+        if (locationFilter !== "all") legacyQuery.eq("location_id", Number(locationFilter));
+        if (from) legacyQuery.gte("created_at", new Date(`${from}T00:00:00`).toISOString());
+        if (to) legacyQuery.lte("created_at", new Date(`${to}T23:59:59`).toISOString());
+
+        if (q) {
+          const orderNumberMatch = /^\d+$/.test(q) ? Number(q) : null;
+          const { data: matchedProfiles } = await supabase
+            .from("profiles")
+            .select("id")
+            .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%`);
+          const matchingIds = (matchedProfiles ?? []).map((p) => p.id);
+
+          const orConditions: string[] = [];
+          if (matchingIds.length > 0) orConditions.push(`profile_id.in.(${matchingIds.join(",")})`);
+          if (orderNumberMatch !== null) orConditions.push(`order_number.eq.${orderNumberMatch}`);
+
+          if (orConditions.length > 0) legacyQuery.or(orConditions.join(","));
+          else legacyQuery.eq("profile_order_id", "00000000-0000-0000-0000-000000000000");
+        }
+
+        const { data: legacyData, count: legacyCount, error: legacyError } = await legacyQuery.range(
+          rangeFrom,
+          rangeTo,
+        );
+
+        if (legacyError) {
+          console.error("[orders] load error", {
+            primary: error.message,
+            legacy: legacyError.message,
+          });
+          loadError = `No se pudieron cargar los pedidos. Detalle: ${error.message} | fallback: ${legacyError.message}`;
+        }
+
+        orders = (legacyData ?? []).map((o) => ({
+          ...o,
+          discount_total: 0,
+          is_courtesy: false,
+          courtesy_reason: null,
+        }));
+        count = legacyCount ?? 0;
+      }
 
       const totalCount = count ?? 0;
       const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -153,6 +223,7 @@ export default async function DashboardPage({
           page={page}
           totalPages={totalPages}
           totalCount={totalCount}
+          loadError={loadError}
         />
       );
     }
@@ -438,7 +509,7 @@ export default async function DashboardPage({
         .select(
           `
           profile_order_id, order_number, total, subtotal, created_at, notes, status_order_id,
-          profiles(first_name, last_name, email),
+          profiles!profile_has_order_profile_id_fkey(first_name, last_name, email),
           status_order(status_order_id, name, code, sort_order)
         `,
         )

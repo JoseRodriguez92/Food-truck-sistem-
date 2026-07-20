@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
   searchCustomers,
@@ -66,6 +67,8 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
   // Carrito
   const [cart, setCart] = useState<CartLine[]>([]);
   const [notes, setNotes] = useState("");
+  const [isCourtesy, setIsCourtesy] = useState(false);
+  const [courtesyReason, setCourtesyReason] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -109,6 +112,8 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
     setCatalogQuery("");
     setCart([]);
     setNotes("");
+    setIsCourtesy(false);
+    setCourtesyReason("");
   }
 
   function addToCart(item: CatalogItem) {
@@ -146,11 +151,17 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
       toast.error("Agregá al menos un producto");
       return;
     }
+    if (isCourtesy && !courtesyReason.trim()) {
+      toast.error("Debes indicar el motivo de la cortesía");
+      return;
+    }
     startTransition(async () => {
       const result = await createManualOrder({
         profileId: customerMode === "search" ? (selectedCustomer?.id ?? null) : null,
         locationId: Number(locationId),
         notes,
+        isCourtesy,
+        courtesyReason,
         items: cart.map((l) => ({ type: l.type, itemId: l.id, name: l.name, price: l.price, quantity: l.quantity })),
       });
       if ("error" in result) {
@@ -345,10 +356,35 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
             <Label htmlFor="order-notes">Notas <span className="text-muted-foreground text-xs">(mesa, referencia, etc.)</span></Label>
             <Textarea id="order-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
+
+          <div className="space-y-2 rounded-lg border border-border px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">Marcar como cortesía</p>
+                <p className="text-xs text-muted-foreground">El total del pedido quedará en $ 0</p>
+              </div>
+              <Switch checked={isCourtesy} onCheckedChange={setIsCourtesy} />
+            </div>
+
+            {isCourtesy && (
+              <div className="space-y-1.5 pt-1">
+                <Label htmlFor="courtesy-reason">Motivo de la cortesía</Label>
+                <Textarea
+                  id="courtesy-reason"
+                  rows={2}
+                  value={courtesyReason}
+                  onChange={(e) => setCourtesyReason(e.target.value)}
+                  placeholder="Ej. compensación por demora"
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         <DialogFooter className={cn("flex items-center border-t border-border pt-4", "sm:justify-between")}>
-          <span className="text-sm font-semibold">Total: {formatCurrency(total)}</span>
+          <span className="text-sm font-semibold">
+            Total: {isCourtesy ? formatCurrency(0) : formatCurrency(total)}
+          </span>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={isPending || cart.length === 0}>

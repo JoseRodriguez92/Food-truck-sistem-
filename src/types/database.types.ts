@@ -1295,9 +1295,12 @@ export type Database = {
       }
       profile_has_order: {
         Row: {
+          courtesy_by: string | null
+          courtesy_reason: string | null
           created_at: string
           delivery_fee: number
           discount_total: number
+          is_courtesy: boolean
           location_id: number | null
           notes: string | null
           order_number: number
@@ -1311,9 +1314,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          courtesy_by?: string | null
+          courtesy_reason?: string | null
           created_at?: string
           delivery_fee?: number
           discount_total?: number
+          is_courtesy?: boolean
           location_id?: number | null
           notes?: string | null
           order_number?: never
@@ -1327,9 +1333,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          courtesy_by?: string | null
+          courtesy_reason?: string | null
           created_at?: string
           delivery_fee?: number
           discount_total?: number
+          is_courtesy?: boolean
           location_id?: number | null
           notes?: string | null
           order_number?: never
@@ -1343,6 +1352,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profile_has_order_courtesy_by_fkey"
+            columns: ["courtesy_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profile_has_order_location_id_fkey"
             columns: ["location_id"]

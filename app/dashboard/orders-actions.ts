@@ -107,6 +107,8 @@ const createManualOrderSchema = z.object({
   profileId: z.string().uuid().nullable(),
   locationId: z.number({ required_error: "Elegí una ubicación", invalid_type_error: "Elegí una ubicación" }),
   notes: z.string().optional(),
+  isCourtesy: z.boolean().optional(),
+  courtesyReason: z.string().optional(),
   items: z.array(itemSchema).min(1, "Agregá al menos un producto"),
 });
 
@@ -114,10 +116,18 @@ export async function createManualOrder(input: {
   profileId: string | null;
   locationId: number | null;
   notes?: string;
+  isCourtesy?: boolean;
+  courtesyReason?: string;
   items: { type: "product" | "combo"; itemId: number; name: string; price: number; quantity: number }[];
 }) {
   const parsed = createManualOrderSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.errors[0].message };
+
+  const isCourtesy = !!parsed.data.isCourtesy;
+  const courtesyReason = parsed.data.courtesyReason?.trim() ?? "";
+  if (isCourtesy && !courtesyReason) {
+    return { error: "Debes indicar el motivo de la cortesía" };
+  }
 
   const supabase = await createClient();
   const {
@@ -135,6 +145,8 @@ export async function createManualOrder(input: {
 
   // 2. Totales
   const subtotal = parsed.data.items.reduce((acc, i) => acc + i.price * i.quantity, 0);
+  const discountTotal = isCourtesy ? subtotal : 0;
+  const total = isCourtesy ? 0 : subtotal;
 
   // 3. Crear profile_has_order
   const { data: order, error: orderErr } = await supabase
@@ -144,7 +156,11 @@ export async function createManualOrder(input: {
       status_order_id: statusPending.status_order_id,
       location_id: parsed.data.locationId,
       subtotal,
-      total: subtotal,
+      discount_total: discountTotal,
+      total,
+      is_courtesy: isCourtesy,
+      courtesy_reason: isCourtesy ? courtesyReason : null,
+      courtesy_by: isCourtesy ? user.id : null,
       notes: parsed.data.notes?.trim() || null,
     })
     .select("profile_order_id, order_number")
@@ -170,6 +186,83 @@ export async function createManualOrder(input: {
     changed_by: user.id,
     notes: "Pedido creado manualmente desde el panel",
   });
+
+  revalidatePath("/dashboard");
+  return { success: true, orderNumber: order.order_number };
+}
+
+const updateManualOrderSchema = z.object({
+  profileOrderId: z.string().uuid(),
+  notes: z.string().optional(),
+  isCourtesy: z.boolean().optional(),
+  courtesyReason: z.string().optional(),
+  items: z.array(itemSchema).min(1, "Agregá al menos un producto"),
+});
+
+export async function updateManualOrder(input: {
+  profileOrderId: string;
+  notes?: string;
+  isCourtesy?: boolean;
+  courtesyReason?: string;
+  items: { type: "product" | "combo"; itemId: number; name: string; price: number; quantity: number }[];
+}) {
+  const parsed = updateManualOrderSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.errors[0].message };
+
+  const isCourtesy = !!parsed.data.isCourtesy;
+  const courtesyReason = parsed.data.courtesyReason?.trim() ?? "";
+  if (isCourtesy && !courtesyReason) {
+    return { error: "Debes indicar el motivo de la cortesía" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado" };
+
+  const { data: order, error: orderErr } = await supabase
+    .from("profile_has_order")
+    .select("profile_order_id, order_number")
+    .eq("profile_order_id", parsed.data.profileOrderId)
+    .single();
+  if (orderErr || !order) return { error: "Pedido no encontrado" };
+
+  const subtotal = parsed.data.items.reduce((acc, i) => acc + i.price * i.quantity, 0);
+  const discountTotal = isCourtesy ? subtotal : 0;
+  const total = isCourtesy ? 0 : subtotal;
+
+  const { error: deleteErr } = await supabase
+    .from("order_detail")
+    .delete()
+    .eq("profile_order_id", parsed.data.profileOrderId);
+  if (deleteErr) return { error: deleteErr.message };
+
+  const details = parsed.data.items.map((item) => ({
+    profile_order_id: parsed.data.profileOrderId,
+    product_id: item.type === "product" ? item.itemId : null,
+    combo_id: item.type === "combo" ? item.itemId : null,
+    quantity: item.quantity,
+    unit_price: item.price,
+    line_total: item.price * item.quantity,
+  }));
+
+  const { error: detailErr } = await supabase.from("order_detail").insert(details);
+  if (detailErr) return { error: detailErr.message };
+
+  const { error: updateErr } = await supabase
+    .from("profile_has_order")
+    .update({
+      subtotal,
+      discount_total: discountTotal,
+      total,
+      is_courtesy: isCourtesy,
+      courtesy_reason: isCourtesy ? courtesyReason : null,
+      courtesy_by: isCourtesy ? user.id : null,
+      notes: parsed.data.notes?.trim() || null,
+    })
+    .eq("profile_order_id", parsed.data.profileOrderId);
+  if (updateErr) return { error: updateErr.message };
 
   revalidatePath("/dashboard");
   return { success: true, orderNumber: order.order_number };

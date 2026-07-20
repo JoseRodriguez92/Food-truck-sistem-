@@ -56,21 +56,26 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
   });
 
   async function onSubmit(data: LoginForm) {
-    setServerError(null);
-    const formData = new FormData();
-    formData.set("email", data.email);
-    formData.set("password", data.password);
-    if (redirectTo) formData.set("redirect", redirectTo);
-    const result = await login(formData);
-    if (!result) return;
-    if ("error" in result) {
-      setServerError(
-        result.error === "Invalid login credentials"
-          ? "Correo o contraseña incorrectos"
-          : (result.error ?? "Error al iniciar sesión")
-      );
-    } else if ("redirect" in result) {
-      router.push(result.redirect);
+    try {
+      setServerError(null);
+      const formData = new FormData();
+      formData.set("email", data.email);
+      formData.set("password", data.password);
+      if (redirectTo) formData.set("redirect", redirectTo);
+      const result = await login(formData);
+      if (!result) return;
+      if ("error" in result) {
+        setServerError(
+          result.error === "Invalid login credentials"
+            ? "Correo o contraseña incorrectos"
+            : (result.error ?? "Error al iniciar sesión")
+        );
+      } else if ("redirect" in result) {
+        router.push(result.redirect);
+      }
+    } catch (err) {
+      console.error("[login-form] submit error", err);
+      setServerError("No se pudo conectar con el servidor. Intenta nuevamente.");
     }
   }
 

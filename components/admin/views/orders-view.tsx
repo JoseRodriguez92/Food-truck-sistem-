@@ -1,18 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, ShoppingBag, Package, Layers, Plus, MapPin } from "lucide-react";
+import { Search, X, ShoppingBag, Package, Layers, Plus, Minus, MapPin, Pencil, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { OrderStatusSelect } from "@/components/admin/order-status-select";
 import { SectionHeader } from "@/components/admin/section-header";
 import { CreateOrderDialog } from "@/components/admin/create-order-dialog";
+import { getCatalogForOrder, updateManualOrder } from "@/app/dashboard/orders-actions";
 
 // ============================================================
 // TIPOS
@@ -51,6 +56,9 @@ export type OrderRow = {
   order_number: number;
   total: number;
   subtotal: number;
+  discount_total: number;
+  is_courtesy: boolean;
+  courtesy_reason: string | null;
   created_at: string;
   notes: string | null;
   status_order_id: string | null;
@@ -68,6 +76,9 @@ export type OrdersFilters = {
   from: string;
   to: string;
 };
+
+type CatalogItem = { id: number; name: string; price: number; type: "product" | "combo" };
+type EditableLine = CatalogItem & { quantity: number };
 
 function locationLabel(loc: LocationOption | null): string {
   if (!loc) return "—";
@@ -102,6 +113,34 @@ function getStatusStyle(code: string) {
   return "bg-muted text-muted-foreground border-border";
 }
 
+function toEditableLines(order: OrderRow): EditableLine[] {
+  return (order.order_detail ?? [])
+    .map((line) => {
+      const product = one(line.product);
+      const combo = one(line.combo);
+      if (product) {
+        return {
+          id: product.product_id,
+          name: product.name,
+          price: line.unit_price,
+          quantity: line.quantity,
+          type: "product" as const,
+        };
+      }
+      if (combo) {
+        return {
+          id: combo.combo_id,
+          name: combo.name,
+          price: line.unit_price,
+          quantity: line.quantity,
+          type: "combo" as const,
+        };
+      }
+      return null;
+    })
+    .filter((line): line is EditableLine => line !== null);
+}
+
 // ============================================================
 // VISTA PRINCIPAL
 // ============================================================
@@ -113,6 +152,7 @@ export function OrdersView({
   page,
   totalPages,
   totalCount,
+  loadError,
 }: {
   orders: OrderRow[];
   allStatuses: OrderStatus[];
@@ -121,6 +161,7 @@ export function OrdersView({
   page: number;
   totalPages: number;
   totalCount: number;
+  loadError?: string | null;
 }) {
   const router = useRouter();
 
@@ -131,6 +172,143 @@ export function OrdersView({
   const [to, setTo] = useState(filters.to);
   const [detailOrder, setDetailOrder] = useState<OrderRow | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editLines, setEditLines] = useState<EditableLine[]>([]);
+  const [editNotes, setEditNotes] = useState("");
+  const [editIsCourtesy, setEditIsCourtesy] = useState(false);
+  const [editCourtesyReason, setEditCourtesyReason] = useState("");
+  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [isSaving, startSaving] = useTransition();
+
+  useEffect(() => {
+    if (!isEditing || !detailOrder) return;
+    let cancelled = false;
+    setCatalogLoading(true);
+    getCatalogForOrder()
+      .then(({ products, combos }) => {
+        if (cancelled) return;
+        setCatalog([
+          ...products.map((p) => ({ id: p.product_id, name: p.name, price: p.price, type: "product" as const })),
+          ...combos.map((c) => ({ id: c.combo_id, name: c.name, price: c.price, type: "combo" as const })),
+        ]);
+      })
+      .finally(() => {
+        if (!cancelled) setCatalogLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isEditing, detailOrder]);
+
+  const filteredCatalog = useMemo(() => {
+    const qValue = catalogQuery.trim().toLowerCase();
+    if (!qValue) return catalog;
+    return catalog.filter((item) => item.name.toLowerCase().includes(qValue));
+  }, [catalog, catalogQuery]);
+
+  const editTotal = useMemo(
+    () => editLines.reduce((acc, line) => acc + line.price * line.quantity, 0),
+    [editLines],
+  );
+
+  function openDetail(order: OrderRow) {
+    setDetailOrder(order);
+    setIsEditing(false);
+    setEditLines([]);
+    setEditIsCourtesy(false);
+    setEditCourtesyReason("");
+    setCatalogQuery("");
+    setCatalog([]);
+  }
+
+  function closeDetail() {
+    setDetailOrder(null);
+    setIsEditing(false);
+    setEditLines([]);
+    setEditNotes("");
+    setEditIsCourtesy(false);
+    setEditCourtesyReason("");
+    setCatalogQuery("");
+    setCatalog([]);
+  }
+
+  function startEdit() {
+    if (!detailOrder) return;
+    setEditLines(toEditableLines(detailOrder));
+    setEditNotes(detailOrder.notes ?? "");
+    setEditIsCourtesy(!!detailOrder.is_courtesy);
+    setEditCourtesyReason(detailOrder.courtesy_reason ?? "");
+    setCatalogQuery("");
+    setIsEditing(true);
+  }
+
+  function addLine(item: CatalogItem) {
+    setEditLines((prev) => {
+      const existing = prev.find((line) => line.type === item.type && line.id === item.id);
+      if (!existing) return [...prev, { ...item, quantity: 1 }];
+      return prev.map((line) =>
+        line.type === item.type && line.id === item.id
+          ? { ...line, quantity: line.quantity + 1 }
+          : line,
+      );
+    });
+  }
+
+  function changeQty(item: EditableLine, delta: number) {
+    setEditLines((prev) =>
+      prev
+        .map((line) =>
+          line.type === item.type && line.id === item.id
+            ? { ...line, quantity: line.quantity + delta }
+            : line,
+        )
+        .filter((line) => line.quantity > 0),
+    );
+  }
+
+  function removeLine(item: EditableLine) {
+    setEditLines((prev) => prev.filter((line) => !(line.type === item.type && line.id === item.id)));
+  }
+
+  function saveEdition() {
+    if (!detailOrder) return;
+    if (editLines.length === 0) {
+      toast.error("El pedido debe tener al menos un item");
+      return;
+    }
+    if (editIsCourtesy && !editCourtesyReason.trim()) {
+      toast.error("Debes indicar el motivo de la cortesía");
+      return;
+    }
+
+    startSaving(async () => {
+      const result = await updateManualOrder({
+        profileOrderId: detailOrder.profile_order_id,
+        notes: editNotes,
+        isCourtesy: editIsCourtesy,
+        courtesyReason: editCourtesyReason,
+        items: editLines.map((line) => ({
+          type: line.type,
+          itemId: line.id,
+          name: line.name,
+          price: line.price,
+          quantity: line.quantity,
+        })),
+      });
+
+      if ("error" in result) {
+        toast.error(result.error);
+        return;
+      }
+
+      toast.success(`Pedido #${result.orderNumber} actualizado`);
+      setIsEditing(false);
+      closeDetail();
+      navigate({ page });
+    });
+  }
 
   const hasActiveFilters = !!(
     filters.q ||
@@ -245,6 +423,12 @@ export function OrdersView({
         </div>
       </div>
 
+      {loadError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {loadError}
+        </div>
+      )}
+
       {/* Tabla */}
       <div className="rounded-xl border border-border overflow-hidden">
         {orders.length === 0 ? (
@@ -290,7 +474,16 @@ export function OrdersView({
                       <TableCell className="hidden sm:table-cell text-sm text-muted-foreground" suppressHydrationWarning>
                         {formatDateTime(order.created_at)}
                       </TableCell>
-                      <TableCell className="text-right font-medium text-sm">{formatCurrency(order.total)}</TableCell>
+                      <TableCell className="text-right font-medium text-sm">
+                        <div className="flex flex-col items-end gap-1">
+                          <span>{formatCurrency(order.total)}</span>
+                          {order.is_courtesy && (
+                            <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                              Cortesía
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         {orderStatus && (
                           <Badge className={`text-xs border ${getStatusStyle(orderStatus.code)}`} variant="outline">
@@ -306,7 +499,7 @@ export function OrdersView({
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" onClick={() => setDetailOrder(order)}>
+                        <Button variant="ghost" size="sm" onClick={() => openDetail(order)}>
                           Ver
                         </Button>
                       </TableCell>
@@ -335,7 +528,7 @@ export function OrdersView({
       )}
 
       {/* Detalle del pedido */}
-      <Sheet open={!!detailOrder} onOpenChange={(o) => !o && setDetailOrder(null)}>
+      <Sheet open={!!detailOrder} onOpenChange={(o) => !o && closeDetail()}>
         <SheetContent className="sm:max-w-md">
           <SheetHeader>
             <SheetTitle>Pedido #{detailOrder?.order_number}</SheetTitle>
@@ -349,48 +542,212 @@ export function OrdersView({
                 </span>
               </div>
 
-              <div className="rounded-lg border border-border divide-y divide-border">
-                {(detailOrder.order_detail ?? []).length === 0 ? (
-                  <p className="text-sm text-muted-foreground p-3">Sin líneas de detalle registradas</p>
-                ) : (
-                  detailOrder.order_detail!.map((line) => {
-                    const product = one(line.product);
-                    const combo = one(line.combo);
-                    const Icon = combo ? Layers : Package;
-                    const itemName = product?.name ?? combo?.name ?? "Ítem eliminado";
+              {!isEditing ? (
+                <>
+                  <div className="rounded-lg border border-border divide-y divide-border">
+                    {(detailOrder.order_detail ?? []).length === 0 ? (
+                      <p className="text-sm text-muted-foreground p-3">Sin líneas de detalle registradas</p>
+                    ) : (
+                      detailOrder.order_detail!.map((line) => {
+                        const product = one(line.product);
+                        const combo = one(line.combo);
+                        const Icon = combo ? Layers : Package;
+                        const itemName = product?.name ?? combo?.name ?? "Ítem eliminado";
 
-                    return (
-                      <div key={line.order_detail_id} className="flex items-center justify-between gap-3 p-3">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{itemName}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {line.quantity} x {formatCurrency(line.unit_price)}
-                            </p>
+                        return (
+                          <div key={line.order_detail_id} className="flex items-center justify-between gap-3 p-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{itemName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {line.quantity} x {formatCurrency(line.unit_price)}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-sm font-medium shrink-0">{formatCurrency(line.line_total)}</span>
                           </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm pt-2 border-t border-border">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>{formatCurrency(detailOrder.subtotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-base font-semibold">
+                    <span>Total</span>
+                    <span>{formatCurrency(detailOrder.total)}</span>
+                  </div>
+
+                  {detailOrder.is_courtesy && (
+                    <div className="rounded-lg border border-primary/25 bg-primary/5 p-3">
+                      <p className="text-xs font-medium text-primary mb-1">Pedido en cortesía</p>
+                      <p className="text-sm text-muted-foreground">
+                        {detailOrder.courtesy_reason || "Sin motivo especificado"}
+                      </p>
+                    </div>
+                  )}
+
+                  {detailOrder.notes && (
+                    <div className="rounded-lg bg-muted/50 p-3">
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Notas</p>
+                      <p className="text-sm">{detailOrder.notes}</p>
+                    </div>
+                  )}
+
+                  <Button variant="outline" className="w-full gap-2" onClick={startEdit}>
+                    <Pencil className="w-3.5 h-3.5" /> Editar pedido
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="grid gap-3">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                      <Input
+                        value={catalogQuery}
+                        onChange={(e) => setCatalogQuery(e.target.value)}
+                        placeholder="Buscar producto o combo..."
+                        className="pl-8"
+                      />
+                    </div>
+                    <ScrollArea className="h-36 rounded-lg border border-border">
+                      {catalogLoading ? (
+                        <div className="p-3 text-xs text-muted-foreground flex items-center gap-2">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Cargando catálogo...
                         </div>
-                        <span className="text-sm font-medium shrink-0">{formatCurrency(line.line_total)}</span>
+                      ) : filteredCatalog.length === 0 ? (
+                        <p className="p-3 text-xs text-muted-foreground">Sin resultados</p>
+                      ) : (
+                        <div className="divide-y divide-border">
+                          {filteredCatalog.map((item) => {
+                            const Icon = item.type === "combo" ? Layers : Package;
+                            return (
+                              <button
+                                key={`${item.type}-${item.id}`}
+                                onClick={() => addLine(item)}
+                                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-accent transition-colors"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                  <span className="text-sm truncate">{item.name}</span>
+                                </div>
+                                <span className="text-xs text-muted-foreground">{formatCurrency(item.price)}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </div>
+
+                  <div className="rounded-lg border border-border divide-y divide-border">
+                    {editLines.length === 0 ? (
+                      <p className="text-sm text-muted-foreground p-3">Agregá al menos un item al pedido</p>
+                    ) : (
+                      editLines.map((line) => {
+                        const Icon = line.type === "combo" ? Layers : Package;
+                        return (
+                          <div key={`${line.type}-${line.id}`} className="flex items-center justify-between gap-3 p-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{line.name}</p>
+                                <p className="text-xs text-muted-foreground">{formatCurrency(line.price)} c/u</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => changeQty(line, -1)}
+                              >
+                                <Minus className="w-3 h-3" />
+                              </Button>
+                              <span className="text-sm w-5 text-center">{line.quantity}</span>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => changeQty(line, 1)}
+                              >
+                                <Plus className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={() => removeLine(line)}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">Notas</p>
+                    <Textarea
+                      rows={2}
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      placeholder="Notas del pedido"
+                    />
+                  </div>
+
+                  <div className="space-y-2 rounded-lg border border-border px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium">Marcar como cortesía</p>
+                        <p className="text-xs text-muted-foreground">El total final será $ 0</p>
                       </div>
-                    );
-                  })
-                )}
-              </div>
+                      <Switch checked={editIsCourtesy} onCheckedChange={setEditIsCourtesy} />
+                    </div>
+                    {editIsCourtesy && (
+                      <Textarea
+                        rows={2}
+                        value={editCourtesyReason}
+                        onChange={(e) => setEditCourtesyReason(e.target.value)}
+                        placeholder="Motivo de la cortesía"
+                      />
+                    )}
+                  </div>
 
-              <div className="flex items-center justify-between text-sm pt-2 border-t border-border">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>{formatCurrency(detailOrder.subtotal)}</span>
-              </div>
-              <div className="flex items-center justify-between text-base font-semibold">
-                <span>Total</span>
-                <span>{formatCurrency(detailOrder.total)}</span>
-              </div>
+                  <div className="space-y-1 pt-2 border-t border-border">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal actualizado</span>
+                      <span>{formatCurrency(editTotal)}</span>
+                    </div>
+                    {editIsCourtesy && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Descuento cortesía</span>
+                        <span>- {formatCurrency(editTotal)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-base font-semibold">
+                      <span>Total actualizado</span>
+                      <span>{formatCurrency(editIsCourtesy ? 0 : editTotal)}</span>
+                    </div>
+                  </div>
 
-              {detailOrder.notes && (
-                <div className="rounded-lg bg-muted/50 p-3">
-                  <p className="text-xs font-medium text-muted-foreground mb-1">Notas</p>
-                  <p className="text-sm">{detailOrder.notes}</p>
-                </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button type="button" variant="outline" onClick={() => setIsEditing(false)} disabled={isSaving}>
+                      Cancelar
+                    </Button>
+                    <Button type="button" onClick={saveEdition} disabled={isSaving || editLines.length === 0}>
+                      {isSaving ? "Guardando..." : "Guardar cambios"}
+                    </Button>
+                  </div>
+                </>
               )}
             </div>
           )}
