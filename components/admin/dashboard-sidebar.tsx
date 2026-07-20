@@ -22,11 +22,13 @@ import {
   Tag,
   ClipboardList,
   Receipt,
+  Boxes,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { ProfilePopover } from "@/components/admin/profile-popover";
+import { TruckPicker } from "@/components/admin/truck-picker";
 import { usePermissions } from "@/hooks/usePermissions";
 
 interface Profile {
@@ -55,6 +57,7 @@ const truckLinks = [
 // Sub-items del acordeón Catálogo
 const catalogLinks = [
   { section: "catalog.ingredients", label: "Ingredientes", icon: Leaf },
+  { section: "catalog.lotes", label: "Lotes", icon: Boxes },
   { section: "catalog.categories", label: "Categorías", icon: Tag },
   { section: "catalog.products", label: "Productos", icon: Package },
   { section: "catalog.combos", label: "Combos", icon: Layers },
@@ -298,6 +301,9 @@ export function DashboardSidebar({ profile }: { profile: Profile | null }) {
             className="h-15 w-auto margin-x-auto"
           />
         </div>
+        <div className="px-3 pt-3">
+          <TruckPicker className="w-full" />
+        </div>
         <div className="flex-1 p-3 overflow-y-auto scrollbar-brand">
           <NavItems activeSection={activeSection} />
         </div>
@@ -337,6 +343,9 @@ export function DashboardSidebar({ profile }: { profile: Profile | null }) {
                 height={32}
                 className="h-8 w-auto"
               />
+            </div>
+            <div className="px-3 pt-3">
+              <TruckPicker className="w-full" />
             </div>
             <div className="flex-1 p-3 overflow-y-auto scrollbar-brand">
               <NavItems activeSection={activeSection} onNavigate={() => setOpen(false)} />

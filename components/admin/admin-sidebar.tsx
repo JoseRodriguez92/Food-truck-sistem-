@@ -22,6 +22,7 @@ import {
   Tag,
   ClipboardList,
   Receipt,
+  Boxes,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -52,6 +53,7 @@ const truckLinks = [
 // Sub-items del acordeón Catálogo
 const catalogLinks = [
   { href: "/admin/ingredients", label: "Ingredientes", icon: Leaf },
+  { href: "/admin/lotes", label: "Lotes", icon: Boxes },
   { href: "/admin/categories", label: "Categorías", icon: Tag },
   { href: "/admin/products", label: "Productos", icon: Package },
   { href: "/admin/combos", label: "Combos", icon: Layers },
@@ -74,6 +76,7 @@ const HREF_TO_MODULE: Record<string, string> = {
   "/admin/food-trucks": "trucks.food_trucks",
   "/admin/locations": "trucks.locations",
   "/admin/ingredients": "catalog.ingredients",
+  "/admin/lotes": "catalog.lotes",
   "/admin/categories": "catalog.categories",
   "/admin/products": "catalog.products",
   "/admin/combos": "catalog.combos",

@@ -64,7 +64,7 @@ export async function deleteIngredient(id: number) {
 
 /* ── Stock ─────────────────────────────────────────────────────────────── */
 
-export type MovementType = "entrada" | "salida" | "ajuste";
+export type MovementType = "entrada" | "salida" | "ajuste" | "produccion";
 
 export async function adjustStock(
   foodtruckId: number,

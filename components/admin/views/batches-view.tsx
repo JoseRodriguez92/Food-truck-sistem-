@@ -9,11 +9,10 @@ import {
   Plus,
   Pencil,
   Trash2,
-  Leaf,
+  Layers,
   Search,
   X,
-  FlaskConical,
-  PackagePlus,
+  Factory,
   History,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -56,32 +55,39 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 
-import {
-  createIngredient,
-  updateIngredient,
-  deleteIngredient,
-} from "@/app/admin/ingredients/actions";
-import { StockAdjustDrawer } from "@/components/admin/stock-adjust-drawer";
+import { createBatch, updateBatch, deleteBatch } from "@/app/admin/lotes/actions";
+import { BatchRecipeDialog } from "@/components/admin/batch-recipe-dialog";
+import { BatchProduceDrawer } from "@/components/admin/batch-produce-drawer";
 import { StockHistoryDrawer } from "@/components/admin/stock-history-drawer";
 import { SectionHeader } from "@/components/admin/section-header";
 import { useSelectedTruckStore } from "@/lib/store/selected-truck";
 
-export type Ingredient = {
+export type BatchRecipeItem = {
+  batch_recipe_id: number;
+  component_ingredient_id: number;
+  quantity: number;
+  ingredient: { ingredient_id: number; name: string; unit: string };
+};
+
+export type Batch = {
   ingredient_id: number;
   name: string;
   unit: string;
   description: string | null;
   created_at: string;
+  batch_recipe: BatchRecipeItem[];
 };
 
-export type FoodTruck = {
-  food_truck_id: number;
+export type AllIngredient = {
+  ingredient_id: number;
   name: string;
+  unit: string;
+  is_batch: boolean;
 };
 
-export type IngredientWithStock = Ingredient & {
-  stock: number;
-};
+export type FoodTruck = { food_truck_id: number; name: string };
+
+type BatchWithStock = Batch & { stock: number };
 
 const UNITS = [
   { value: "gr", label: "Gramos (gr)" },
@@ -98,14 +104,12 @@ const schema = z.object({
 });
 type FormValues = z.infer<typeof schema>;
 
-function IngredientForm({
+function BatchForm({
   defaultValues,
-  isPending,
   unitValue,
   onUnitChange,
 }: {
   defaultValues?: Partial<FormValues>;
-  isPending: boolean;
   unitValue: string;
   onUnitChange: (v: string) => void;
 }) {
@@ -114,26 +118,20 @@ function IngredientForm({
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: defaultValues ?? {
-      name: "",
-      unit: "gr",
-      description: "",
-    },
+    defaultValues: defaultValues ?? { name: "", unit: "gr", description: "" },
   });
 
   return (
-    <form id="ingredient-form" className="space-y-4">
+    <form id="batch-form" className="space-y-4">
       <div className="space-y-1.5">
-        <Label htmlFor="ing-name">Nombre</Label>
+        <Label htmlFor="batch-name">Nombre</Label>
         <Input
-          id="ing-name"
-          placeholder="Ej. Cebolla cabezona"
+          id="batch-name"
+          placeholder="Ej. Relleno carne firme"
           aria-invalid={!!errors.name}
           {...register("name")}
         />
-        {errors.name && (
-          <p className="text-xs text-destructive">{errors.name.message}</p>
-        )}
+        {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
       </div>
 
       <div className="space-y-1.5">
@@ -154,16 +152,10 @@ function IngredientForm({
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="ing-desc">
-          Descripción{" "}
-          <span className="text-muted-foreground text-xs">(opcional)</span>
+        <Label htmlFor="batch-desc">
+          Descripción <span className="text-muted-foreground text-xs">(opcional)</span>
         </Label>
-        <Textarea
-          id="ing-desc"
-          placeholder="Notas sobre este ingrediente..."
-          rows={2}
-          {...register("description")}
-        />
+        <Textarea id="batch-desc" placeholder="Notas sobre este lote..." rows={2} {...register("description")} />
       </div>
     </form>
   );
@@ -173,45 +165,38 @@ function stockBadge(stock: number, unit: string) {
   const color =
     stock <= 0
       ? "bg-destructive/10 text-destructive border-destructive/20"
-      : stock < 100
+      : stock < 10
         ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
         : "bg-green-500/10 text-green-500 border-green-500/20";
   return (
-    <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${color}`}
-    >
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${color}`}>
       {stock} {unit}
     </span>
   );
 }
 
-export function IngredientsView({
-  ingredients,
+export function BatchesView({
+  batches,
+  allIngredients,
 }: {
-  ingredients: Ingredient[];
+  batches: Batch[];
+  allIngredients: AllIngredient[];
 }) {
   const selectedTruck = useSelectedTruckStore((s) => s.selectedTruck);
   const [isPending, startTransition] = useTransition();
   const [createOpen, setCreateOpen] = useState(false);
-  const [editItem, setEditItem] = useState<IngredientWithStock | null>(null);
-  const [deleteItem, setDeleteItem] = useState<IngredientWithStock | null>(
-    null,
-  );
-  const [adjustItem, setAdjustItem] = useState<IngredientWithStock | null>(
-    null,
-  );
-  const [historyItem, setHistoryItem] = useState<IngredientWithStock | null>(
-    null,
-  );
+  const [editItem, setEditItem] = useState<BatchWithStock | null>(null);
+  const [deleteItem, setDeleteItem] = useState<BatchWithStock | null>(null);
+  const [recipeItem, setRecipeItem] = useState<Batch | null>(null);
+  const [produceItem, setProduceItem] = useState<Batch | null>(null);
+  const [historyItem, setHistoryItem] = useState<BatchWithStock | null>(null);
 
-  const [ingredientsWithStock, setIngredientsWithStock] = useState<
-    IngredientWithStock[]
-  >([]);
+  const [batchesWithStock, setBatchesWithStock] = useState<BatchWithStock[]>([]);
+  const [stockByIngredient, setStockByIngredient] = useState<Map<number, number>>(new Map());
   const [createUnit, setCreateUnit] = useState("gr");
   const [editUnit, setEditUnit] = useState("gr");
   const [search, setSearch] = useState("");
 
-  // Fetch stock para truck seleccionado
   useEffect(() => {
     if (!selectedTruck) return;
 
@@ -222,29 +207,38 @@ export function IngredientsView({
         .select("ingredient_id, stock")
         .eq("foodtruck_id", selectedTruck);
 
-      const stockMap = new Map(
-        data?.map((d) => [d.ingredient_id, d.stock]) ?? [],
-      );
+      const stockMap = new Map(data?.map((d) => [d.ingredient_id, d.stock]) ?? []);
+      setStockByIngredient(stockMap);
 
-      const withStock = ingredients.map((ing) => ({
-        ...ing,
-        stock: stockMap.get(ing.ingredient_id) ?? 0,
+      const withStock = batches.map((b) => ({
+        ...b,
+        stock: stockMap.get(b.ingredient_id) ?? 0,
       }));
-
-      setIngredientsWithStock(withStock);
+      setBatchesWithStock(withStock);
     };
 
     fetchStock();
-  }, [selectedTruck, ingredients]);
+  }, [selectedTruck, batches]);
+
+  // Recargar el batch abierto en los diálogos con datos frescos tras editar la receta
+  const liveRecipeItem = recipeItem
+    ? (batches.find((b) => b.ingredient_id === recipeItem.ingredient_id) ?? recipeItem)
+    : null;
+  const liveProduceItem: BatchWithStock | null = produceItem
+    ? (batchesWithStock.find((b) => b.ingredient_id === produceItem.ingredient_id) ?? {
+        ...produceItem,
+        stock: 0,
+      })
+    : null;
 
   function handleCreate() {
-    const form = document.getElementById("ingredient-form") as HTMLFormElement;
+    const form = document.getElementById("batch-form") as HTMLFormElement;
     if (!form) return;
     startTransition(async () => {
-      const result = await createIngredient(new FormData(form));
+      const result = await createBatch(new FormData(form));
       if (result?.error) toast.error(result.error);
       else {
-        toast.success("Ingrediente creado");
+        toast.success("Lote creado");
         setCreateOpen(false);
         setCreateUnit("gr");
       }
@@ -253,16 +247,13 @@ export function IngredientsView({
 
   function handleEdit() {
     if (!editItem) return;
-    const form = document.getElementById("ingredient-form") as HTMLFormElement;
+    const form = document.getElementById("batch-form") as HTMLFormElement;
     if (!form) return;
     startTransition(async () => {
-      const result = await updateIngredient(
-        editItem.ingredient_id,
-        new FormData(form),
-      );
+      const result = await updateBatch(editItem.ingredient_id, new FormData(form));
       if (result?.error) toast.error(result.error);
       else {
-        toast.success("Ingrediente actualizado");
+        toast.success("Lote actualizado");
         setEditItem(null);
       }
     });
@@ -271,27 +262,25 @@ export function IngredientsView({
   function handleDelete() {
     if (!deleteItem) return;
     startTransition(async () => {
-      const result = await deleteIngredient(deleteItem.ingredient_id);
+      const result = await deleteBatch(deleteItem.ingredient_id);
       if (result?.error) toast.error(result.error);
       else {
-        toast.success("Ingrediente eliminado");
+        toast.success("Lote eliminado");
         setDeleteItem(null);
       }
     });
   }
 
   const normalizedSearch = search.trim().toLowerCase();
-  const filteredIngredients = normalizedSearch
-    ? ingredientsWithStock.filter((ing) =>
-        ing.name.toLowerCase().includes(normalizedSearch),
-      )
-    : ingredientsWithStock;
+  const filteredBatches = normalizedSearch
+    ? batchesWithStock.filter((b) => b.name.toLowerCase().includes(normalizedSearch))
+    : batchesWithStock;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       <SectionHeader
-        title="Ingredientes"
-        subtitle={`${filteredIngredients.length} ingrediente${filteredIngredients.length !== 1 ? "s" : ""} ${normalizedSearch ? "encontrado" : "registrado"}${filteredIngredients.length !== 1 ? "s" : ""}`}
+        title="Lotes de Producción"
+        subtitle={`${filteredBatches.length} lote${filteredBatches.length !== 1 ? "s" : ""} ${normalizedSearch ? "encontrado" : "registrado"}${filteredBatches.length !== 1 ? "s" : ""}`}
         actions={
           <Button
             onClick={() => {
@@ -301,7 +290,7 @@ export function IngredientsView({
             className="gap-2 shrink-0"
           >
             <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Agregar</span>
+            <span className="hidden sm:inline">Nuevo lote</span>
           </Button>
         }
       />
@@ -312,7 +301,7 @@ export function IngredientsView({
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nombre de ingrediente..."
+            placeholder="Buscar por nombre de lote..."
             className="pl-8 pr-9"
           />
           {search && (
@@ -329,32 +318,19 @@ export function IngredientsView({
         </div>
       </div>
 
-      {/* Tabla */}
       <div className="rounded-xl border border-border overflow-hidden">
-        {filteredIngredients.length === 0 ? (
+        {filteredBatches.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
-            <Leaf className="w-10 h-10 opacity-20" />
+            <Layers className="w-10 h-10 opacity-20" />
             <p className="text-sm">
-              {ingredientsWithStock.length === 0
-                ? "Sin ingredientes registrados"
-                : "Sin resultados para esta busqueda"}
+              {batchesWithStock.length === 0 ? "Sin lotes registrados" : "Sin resultados para esta busqueda"}
             </p>
-            {ingredientsWithStock.length === 0 ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCreateOpen(true)}
-                className="gap-2"
-              >
-                <Plus className="w-3.5 h-3.5" /> Agregar primero
+            {batchesWithStock.length === 0 ? (
+              <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)} className="gap-2">
+                <Plus className="w-3.5 h-3.5" /> Crear primer lote
               </Button>
             ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSearch("")}
-                className="gap-2"
-              >
+              <Button variant="outline" size="sm" onClick={() => setSearch("")} className="gap-2">
                 <X className="w-3.5 h-3.5" /> Limpiar busqueda
               </Button>
             )}
@@ -367,34 +343,66 @@ export function IngredientsView({
                 <TableHead>Nombre</TableHead>
                 <TableHead>Unidad</TableHead>
                 <TableHead>Stock</TableHead>
-                <TableHead className="hidden md:table-cell">
-                  Descripción
-                </TableHead>
-                <TableHead className="w-24 text-right">Acciones</TableHead>
+                <TableHead>Receta</TableHead>
+                <TableHead className="hidden md:table-cell">Descripción</TableHead>
+                <TableHead className="w-32 text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredIngredients.map((ing) => (
-                <TableRow key={ing.ingredient_id}>
-                  <TableCell className="text-muted-foreground font-mono text-sm">
-                    {ing.ingredient_id}
-                  </TableCell>
+              {filteredBatches.map((b) => (
+                <TableRow key={b.ingredient_id}>
+                  <TableCell className="text-muted-foreground font-mono text-sm">{b.ingredient_id}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                        <FlaskConical className="w-3.5 h-3.5 text-primary" />
+                        <Layers className="w-3.5 h-3.5 text-primary" />
                       </div>
-                      <span className="font-medium text-sm">{ing.name}</span>
+                      <span className="font-medium text-sm">{b.name}</span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs font-mono">
-                      {ing.unit}
+                      {b.unit}
                     </Badge>
                   </TableCell>
-                  <TableCell>{stockBadge(ing.stock, ing.unit)}</TableCell>
+                  <TableCell>{stockBadge(b.stock, b.unit)}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1 max-w-40">
+                      {b.batch_recipe.length === 0 ? (
+                        <Badge
+                          variant="outline"
+                          className="cursor-pointer hover:bg-accent text-xs gap-1 text-muted-foreground"
+                          onClick={() => setRecipeItem(b)}
+                        >
+                          <Plus className="w-3 h-3" /> Agregar
+                        </Badge>
+                      ) : (
+                        <>
+                          {b.batch_recipe.slice(0, 2).map((r) => (
+                            <Badge
+                              key={r.batch_recipe_id}
+                              variant="outline"
+                              className="cursor-pointer text-xs bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+                              onClick={() => setRecipeItem(b)}
+                            >
+                              {r.ingredient.name}
+                            </Badge>
+                          ))}
+                          {b.batch_recipe.length > 2 && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs cursor-pointer text-muted-foreground"
+                              onClick={() => setRecipeItem(b)}
+                            >
+                              +{b.batch_recipe.length - 2}
+                            </Badge>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-56 truncate">
-                    {ing.description ?? "—"}
+                    {b.description ?? "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -402,17 +410,18 @@ export function IngredientsView({
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 hover:text-emerald-400"
-                        title="Ajustar stock"
-                        onClick={() => setAdjustItem(ing)}
+                        title="Producir"
+                        disabled={b.batch_recipe.length === 0}
+                        onClick={() => setProduceItem(b)}
                       >
-                        <PackagePlus className="w-3.5 h-3.5" />
+                        <Factory className="w-3.5 h-3.5" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 hover:text-primary"
                         title="Historial de stock"
-                        onClick={() => setHistoryItem(ing)}
+                        onClick={() => setHistoryItem(b)}
                       >
                         <History className="w-3.5 h-3.5" />
                       </Button>
@@ -421,8 +430,8 @@ export function IngredientsView({
                         size="icon"
                         className="h-8 w-8"
                         onClick={() => {
-                          setEditUnit(ing.unit);
-                          setEditItem(ing);
+                          setEditUnit(b.unit);
+                          setEditItem(b);
                         }}
                       >
                         <Pencil className="w-3.5 h-3.5" />
@@ -431,7 +440,7 @@ export function IngredientsView({
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 hover:text-destructive"
-                        onClick={() => setDeleteItem(ing)}
+                        onClick={() => setDeleteItem(b)}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
@@ -448,13 +457,9 @@ export function IngredientsView({
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nuevo ingrediente</DialogTitle>
+            <DialogTitle>Nuevo lote</DialogTitle>
           </DialogHeader>
-          <IngredientForm
-            isPending={isPending}
-            unitValue={createUnit}
-            onUnitChange={setCreateUnit}
-          />
+          <BatchForm unitValue={createUnit} onUnitChange={setCreateUnit} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
               Cancelar
@@ -470,11 +475,10 @@ export function IngredientsView({
       <Dialog open={!!editItem} onOpenChange={(o) => !o && setEditItem(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar ingrediente</DialogTitle>
+            <DialogTitle>Editar lote</DialogTitle>
           </DialogHeader>
           {editItem && (
-            <IngredientForm
-              isPending={isPending}
+            <BatchForm
               unitValue={editUnit}
               onUnitChange={setEditUnit}
               defaultValues={{
@@ -495,12 +499,22 @@ export function IngredientsView({
         </DialogContent>
       </Dialog>
 
-      {/* Drawer Ajustar Stock */}
-      <StockAdjustDrawer
-        ingredient={adjustItem}
+      {/* Dialog Receta */}
+      <BatchRecipeDialog
+        batch={liveRecipeItem}
+        allIngredients={allIngredients}
+        open={!!recipeItem}
+        onOpenChange={(o) => !o && setRecipeItem(null)}
+      />
+
+      {/* Drawer Producir */}
+      <BatchProduceDrawer
+        batch={liveProduceItem}
         foodtruckId={selectedTruck}
-        open={!!adjustItem}
-        onOpenChange={(o) => !o && setAdjustItem(null)}
+        batchStock={liveProduceItem?.stock ?? 0}
+        stockByIngredient={stockByIngredient}
+        open={!!produceItem}
+        onOpenChange={(o) => !o && setProduceItem(null)}
       />
 
       {/* Drawer Historial */}
@@ -512,17 +526,13 @@ export function IngredientsView({
       />
 
       {/* AlertDialog Eliminar */}
-      <AlertDialog
-        open={!!deleteItem}
-        onOpenChange={(o) => !o && setDeleteItem(null)}
-      >
+      <AlertDialog open={!!deleteItem} onOpenChange={(o) => !o && setDeleteItem(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar ingrediente?</AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar lote?</AlertDialogTitle>
             <AlertDialogDescription>
-              Vas a eliminar{" "}
-              <strong className="text-foreground">{deleteItem?.name}</strong>.
-              Si está usado en algún producto no se podrá eliminar.
+              Vas a eliminar <strong className="text-foreground">{deleteItem?.name}</strong>. Si está usado en algún
+              producto o como componente de otro lote no se podrá eliminar.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

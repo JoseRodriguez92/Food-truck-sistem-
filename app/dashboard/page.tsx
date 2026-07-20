@@ -9,6 +9,7 @@ import { CategoriesView, type Category } from "@/components/admin/views/categori
 import { ProductsView, type Product } from "@/components/admin/views/products-view";
 import { MenusView } from "@/components/admin/views/menus-view";
 import { IngredientsView } from "@/components/admin/views/ingredients-view";
+import { BatchesView } from "@/components/admin/views/batches-view";
 import { CombosView } from "@/components/admin/views/combos-view";
 import { ExpensesView } from "@/components/admin/views/expenses-view";
 import { UsersView } from "@/components/admin/views/users-view";
@@ -337,14 +338,39 @@ export default async function DashboardPage({
 
     // ============ INGREDIENTES ============
     case "catalog.ingredients": {
-      const { data: trucks } = await supabase.from("food_truck").select("food_truck_id, name").order("name");
-
       const { data: ingredients } = await supabase
         .from("ingredient")
         .select("ingredient_id, name, unit, description, created_at")
         .order("name");
 
-      return <IngredientsView ingredients={ingredients ?? []} trucks={trucks ?? []} />;
+      return <IngredientsView ingredients={ingredients ?? []} />;
+    }
+
+    // ============ LOTES DE PRODUCCIÓN ============
+    case "catalog.lotes": {
+      const [{ data: batches }, { data: allIngredients }] = await Promise.all([
+        supabase
+          .from("ingredient")
+          .select(
+            `
+            ingredient_id, name, unit, description, created_at,
+            batch_recipe!batch_recipe_batch_ingredient_id_fkey(
+              batch_recipe_id, component_ingredient_id, quantity,
+              ingredient:ingredient!batch_recipe_component_ingredient_id_fkey(ingredient_id, name, unit)
+            )
+          `,
+          )
+          .eq("is_batch", true)
+          .order("name"),
+        supabase.from("ingredient").select("ingredient_id, name, unit, is_batch").order("name"),
+      ]);
+
+      return (
+        <BatchesView
+          batches={(batches ?? []) as unknown as import("@/components/admin/views/batches-view").Batch[]}
+          allIngredients={allIngredients ?? []}
+        />
+      );
     }
 
     // ============ CATEGORÍAS ============

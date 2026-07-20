@@ -5,6 +5,7 @@ import {
   ArrowUpCircle,
   ArrowDownCircle,
   SlidersHorizontal,
+  Factory,
   History,
   ChevronRight,
 } from "lucide-react";
@@ -39,6 +40,12 @@ const TYPE_CONFIG = {
     icon: SlidersHorizontal,
     color: "text-amber-400",
     bg: "bg-amber-500/10",
+  },
+  produccion: {
+    label: "Producción",
+    icon: Factory,
+    color: "text-primary",
+    bg: "bg-primary/10",
   },
 };
 
@@ -149,9 +156,11 @@ export function StockHistoryDrawer({
                           </span>
                           <span className="text-xs text-muted-foreground ml-0.5">
                             (
-                            {mov.type !== "ajuste"
-                              ? `${mov.type === "entrada" ? "+" : "-"}${Number(mov.quantity).toFixed(2)}`
-                              : `Δ${Number(mov.stock_after - mov.stock_before) >= 0 ? "+" : ""}${(Number(mov.stock_after) - Number(mov.stock_before)).toFixed(2)}`}
+                            {mov.type === "salida"
+                              ? `-${Number(mov.quantity).toFixed(2)}`
+                              : mov.type === "entrada" || mov.type === "produccion"
+                                ? `+${Number(mov.quantity).toFixed(2)}`
+                                : `Δ${Number(mov.stock_after - mov.stock_before) >= 0 ? "+" : ""}${(Number(mov.stock_after) - Number(mov.stock_before)).toFixed(2)}`}
                             )
                           </span>
                         </div>

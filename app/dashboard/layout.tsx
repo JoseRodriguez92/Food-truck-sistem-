@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardSidebar } from "@/components/admin/dashboard-sidebar";
 import { PermissionsProvider } from "@/contexts/PermissionsContext";
+import { TruckStoreInit } from "@/components/admin/truck-store-init";
 
 export const metadata = { title: "Panel — 3 Street Food" };
 
@@ -37,8 +38,14 @@ export default async function DashboardLayout({
     .eq("id", user.id)
     .single();
 
+  const { data: trucks } = await supabase
+    .from("food_truck")
+    .select("food_truck_id, name")
+    .order("name");
+
   return (
     <PermissionsProvider>
+      <TruckStoreInit trucks={trucks ?? []} />
       <div className="flex h-screen overflow-hidden bg-background">
         <Suspense fallback={null}>
           <DashboardSidebar profile={profile} />

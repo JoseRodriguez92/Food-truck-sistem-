@@ -776,6 +776,8 @@ export function ProductsView({ products, allIngredients, allCategories }: { prod
                 <TableRow key={p.product_id}>
                   <TableCell className="text-muted-foreground font-mono text-sm">{p.product_id}</TableCell>
                   <TableCell className="font-medium">{p.name}</TableCell>
+                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-48 truncate">{p.description ?? "—"}</TableCell>
+                  <TableCell className="font-medium text-sm">{formatCurrency(p.price)}</TableCell>
                   <TableCell>
                     {p.category ? (
                       <Badge
@@ -795,8 +797,6 @@ export function ProductsView({ products, allIngredients, allCategories }: { prod
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-48 truncate">{p.description ?? "—"}</TableCell>
-                  <TableCell className="font-medium text-sm">{formatCurrency(p.price)}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1 max-w-36">
                       {p.product_has_type.length === 0 ? (
@@ -841,14 +841,37 @@ export function ProductsView({ products, allIngredients, allCategories }: { prod
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant="outline"
-                      className="cursor-pointer hover:bg-accent text-xs gap-1"
-                      onClick={() => setIngredientsProduct(p)}
-                    >
-                      <FlaskConical className="w-3 h-3" />
-                      {p.product_has_ingredient.length}
-                    </Badge>
+                    <div className="flex flex-wrap gap-1 max-w-36">
+                      {p.product_has_ingredient.length === 0 ? (
+                        <Badge
+                          variant="outline"
+                          className="cursor-pointer hover:bg-accent text-xs gap-1 text-muted-foreground"
+                          onClick={() => setIngredientsProduct(p)}
+                        >
+                          <Plus className="w-3 h-3" /> Agregar
+                        </Badge>
+                      ) : (
+                        p.product_has_ingredient.slice(0, 2).map((pi) => (
+                          <Badge
+                            key={pi.product_ingredient_id}
+                            variant="outline"
+                            className="cursor-pointer text-xs bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+                            onClick={() => setIngredientsProduct(p)}
+                          >
+                            {pi.ingredient.name}
+                          </Badge>
+                        ))
+                      )}
+                      {p.product_has_ingredient.length > 2 && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs cursor-pointer text-muted-foreground"
+                          onClick={() => setIngredientsProduct(p)}
+                        >
+                          +{p.product_has_ingredient.length - 2}
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
