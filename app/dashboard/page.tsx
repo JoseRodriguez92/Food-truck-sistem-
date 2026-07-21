@@ -108,7 +108,7 @@ export default async function DashboardPage({
         .from("profile_has_order")
         .select(
           `
-          profile_order_id, order_number, total, subtotal, discount_total, is_courtesy, courtesy_reason, created_at, notes, status_order_id, location_id, stock_deducted,
+          profile_order_id, order_number, total, subtotal, discount_total, is_courtesy, courtesy_reason, created_at, notes, status_order_id, payment_method, location_id, stock_deducted,
           profiles!profile_has_order_profile_id_fkey(first_name, last_name, email),
           status_order(status_order_id, name, code, sort_order),
           location(location_id, name, food_truck(name)),
@@ -162,7 +162,7 @@ export default async function DashboardPage({
           .from("profile_has_order")
           .select(
             `
-            profile_order_id, order_number, total, subtotal, created_at, notes, status_order_id, location_id, stock_deducted,
+            profile_order_id, order_number, total, subtotal, created_at, notes, status_order_id, payment_method, location_id, stock_deducted,
             profiles!profile_has_order_profile_id_fkey(first_name, last_name, email),
             status_order(status_order_id, name, code, sort_order),
             location(location_id, name, food_truck(name)),

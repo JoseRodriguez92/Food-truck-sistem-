@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, ShoppingBag, Package, Layers, Plus, Minus, MapPin, Pencil, Loader2, Trash2, Store, CalendarDays } from "lucide-react";
+import { Search, X, ShoppingBag, Package, Layers, Plus, Minus, MapPin, Pencil, Loader2, Trash2, Store, CalendarDays, Wallet, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -28,8 +28,10 @@ import {
 import { OrderStatusSelect } from "@/components/admin/order-status-select";
 import { SectionHeader } from "@/components/admin/section-header";
 import { CreateOrderDialog } from "@/components/admin/create-order-dialog";
+import { OrdersReportDialog } from "@/components/admin/orders-report-dialog";
 import { getCatalogForOrder, updateManualOrder, deleteOrder } from "@/app/dashboard/orders-actions";
 import { useSelectedTruckStore } from "@/lib/store/selected-truck";
+import { paymentMethodLabel } from "@/lib/payment-method";
 
 // ============================================================
 // TIPOS
@@ -76,6 +78,7 @@ export type OrderRow = {
   created_at: string;
   notes: string | null;
   status_order_id: string | null;
+  payment_method: string | null;
   location_id: number | null;
   profiles: Single<{ first_name: string | null; last_name: string | null; email: string | null }>;
   status_order: Single<OrderStatus>;
@@ -91,7 +94,10 @@ export type OrdersFilters = {
 };
 
 type CatalogItem = { id: number; name: string; price: number; type: "product" | "combo" };
-type EditableLine = CatalogItem & { quantity: number };
+// lineId identifica la fila puntual (order_detail_id real, o un id generado
+// para líneas nuevas) — type+id NO alcanza porque puede haber 2 filas del
+// mismo producto (pedidos con líneas duplicadas por el bug ya corregido).
+type EditableLine = CatalogItem & { quantity: number; lineId: string };
 
 function locationLabel(loc: LocationOption | null): string {
   if (!loc) return "—";
@@ -124,31 +130,6 @@ function toDateInputValue(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-// Mismo mapeo de colores que components/client/order-status-badge.tsx, para
-// que el estado de un pedido se vea igual en el panel admin y en el tracker del cliente.
-const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
-  confirmed: "bg-green-500/10 text-green-600 border-green-500/20",
-  preparing: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  ready: "bg-primary/10 text-primary border-primary/20",
-  on_the_way: "bg-primary/10 text-primary border-primary/20",
-  delivered: "bg-green-500/10 text-green-600 border-green-500/20",
-  cancelled: "bg-destructive/10 text-destructive border-destructive/20",
-};
-
-function getStatusStyle(code: string) {
-  const c = code.toLowerCase();
-  if (STATUS_STYLES[c]) return STATUS_STYLES[c];
-  if (c.includes("pend")) return STATUS_STYLES.pending;
-  if (c.includes("confirm")) return STATUS_STYLES.confirmed;
-  if (c.includes("prep") || c.includes("progress")) return STATUS_STYLES.preparing;
-  if (c.includes("camino") || c.includes("way")) return STATUS_STYLES.on_the_way;
-  if (c.includes("entreg") || c.includes("deliver")) return STATUS_STYLES.delivered;
-  if (c.includes("ready") || c.includes("listo")) return STATUS_STYLES.ready;
-  if (c.includes("cancel") || c.includes("rechaz")) return STATUS_STYLES.cancelled;
-  return "bg-muted text-muted-foreground border-border";
-}
-
 function toEditableLines(order: OrderRow): EditableLine[] {
   return (order.order_detail ?? [])
     .map((line) => {
@@ -161,6 +142,7 @@ function toEditableLines(order: OrderRow): EditableLine[] {
           price: line.unit_price,
           quantity: line.quantity,
           type: "product" as const,
+          lineId: line.order_detail_id,
         };
       }
       if (combo) {
@@ -170,6 +152,7 @@ function toEditableLines(order: OrderRow): EditableLine[] {
           price: line.unit_price,
           quantity: line.quantity,
           type: "combo" as const,
+          lineId: line.order_detail_id,
         };
       }
       return null;
@@ -217,6 +200,7 @@ export function OrdersView({
   }, [selectedTruck]);
   const [detailOrder, setDetailOrder] = useState<OrderRow | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editLines, setEditLines] = useState<EditableLine[]>([]);
   const [editNotes, setEditNotes] = useState("");
@@ -308,29 +292,24 @@ export function OrdersView({
   function addLine(item: CatalogItem) {
     setEditLines((prev) => {
       const existing = prev.find((line) => line.type === item.type && line.id === item.id);
-      if (!existing) return [...prev, { ...item, quantity: 1 }];
-      return prev.map((line) =>
-        line.type === item.type && line.id === item.id
-          ? { ...line, quantity: line.quantity + 1 }
-          : line,
-      );
+      if (!existing) {
+        const lineId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${item.type}-${item.id}-${Date.now()}`;
+        return [...prev, { ...item, quantity: 1, lineId }];
+      }
+      return prev.map((line) => (line.lineId === existing.lineId ? { ...line, quantity: line.quantity + 1 } : line));
     });
   }
 
   function changeQty(item: EditableLine, delta: number) {
     setEditLines((prev) =>
       prev
-        .map((line) =>
-          line.type === item.type && line.id === item.id
-            ? { ...line, quantity: line.quantity + delta }
-            : line,
-        )
+        .map((line) => (line.lineId === item.lineId ? { ...line, quantity: line.quantity + delta } : line))
         .filter((line) => line.quantity > 0),
     );
   }
 
   function removeLine(item: EditableLine) {
-    setEditLines((prev) => prev.filter((line) => !(line.type === item.type && line.id === item.id)));
+    setEditLines((prev) => prev.filter((line) => line.lineId !== item.lineId));
   }
 
   function saveEdition() {
@@ -367,7 +346,7 @@ export function OrdersView({
       toast.success(`Pedido #${result.orderNumber} actualizado`);
       setIsEditing(false);
       closeDetail();
-      navigate({ page });
+      router.refresh();
     });
   }
 
@@ -438,9 +417,14 @@ export function OrdersView({
         title="Pedidos"
         subtitle={`${totalCount} pedido${totalCount !== 1 ? "s" : ""} ${hasActiveFilters ? "(filtrado)" : "en total"}`}
         actions={
-          <Button onClick={() => setCreateOpen(true)} className="gap-2">
-            <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nuevo pedido</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setReportOpen(true)} className="gap-2">
+              <BarChart3 className="w-4 h-4" /> <span className="hidden sm:inline">Generar reporte</span>
+            </Button>
+            <Button onClick={() => setCreateOpen(true)} className="gap-2">
+              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nuevo pedido</span>
+            </Button>
+          </div>
         }
       />
 
@@ -547,7 +531,6 @@ export function OrdersView({
               <TableBody>
                 {orders.map((order) => {
                   const profile = one(order.profiles);
-                  const orderStatus = one(order.status_order);
                   const orderLocation = one(order.location);
                   const customerName = profile?.first_name
                     ? `${profile.first_name} ${profile.last_name ?? ""}`.trim()
@@ -587,17 +570,22 @@ export function OrdersView({
                         </div>
                       </TableCell>
                       <TableCell>
-                        {orderStatus && (
-                          <Badge className={`text-xs border ${getStatusStyle(orderStatus.code)}`} variant="outline">
-                            {orderStatus.name}
-                          </Badge>
-                        )}
-                        <div className="mt-1.5">
+                        <div className="flex flex-col items-start gap-1.5">
                           <OrderStatusSelect
                             profileOrderId={order.profile_order_id}
                             currentStatusId={order.status_order_id}
+                            currentPaymentMethod={order.payment_method}
                             statuses={allStatuses}
                           />
+                          {paymentMethodLabel(order.payment_method) && (
+                            <Badge
+                              variant="outline"
+                              className="gap-1 border-primary/25 bg-primary/10 text-primary text-xs font-medium"
+                            >
+                              <Wallet className="w-3 h-3" />
+                              {paymentMethodLabel(order.payment_method)}
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
@@ -720,6 +708,13 @@ export function OrdersView({
                     <span>{formatCurrency(detailOrder.total)}</span>
                   </div>
 
+                  {paymentMethodLabel(detailOrder.payment_method) && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Medio de pago</span>
+                      <span className="font-medium">{paymentMethodLabel(detailOrder.payment_method)}</span>
+                    </div>
+                  )}
+
                   {detailOrder.is_courtesy && (
                     <div className="rounded-lg border border-primary/25 bg-primary/5 p-3">
                       <p className="text-xs font-medium text-primary mb-1">Pedido en cortesía</p>
@@ -789,7 +784,7 @@ export function OrdersView({
                       editLines.map((line) => {
                         const Icon = line.type === "combo" ? Layers : Package;
                         return (
-                          <div key={`${line.type}-${line.id}`} className="flex items-center justify-between gap-3 p-3">
+                          <div key={line.lineId} className="flex items-center justify-between gap-3 p-3">
                             <div className="flex items-center gap-2 min-w-0">
                               <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                               <div className="min-w-0">
@@ -896,6 +891,13 @@ export function OrdersView({
       </Sheet>
 
       <CreateOrderDialog open={createOpen} onOpenChange={setCreateOpen} />
+
+      <OrdersReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        filters={{ status, q, from, to }}
+        truckId={selectedTruck}
+      />
     </div>
   );
 }

@@ -55,7 +55,7 @@
     "lucide-react": "^0.564.0",
     "maplibre-gl": "^5.24.0",
     "mercadopago": "^2.12.0",
-    "next": "16.2.0",
+    "next": "^15.5.20",
     "nodemailer": "^8.0.4",
     "qrcode": "^1.5.4",
     "react": "^19",

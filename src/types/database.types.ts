@@ -1364,6 +1364,7 @@ export type Database = {
           location_id: number | null
           notes: string | null
           order_number: number
+          payment_method: string | null
           profile_id: string | null
           profile_order_id: string
           status_order_id: string | null
@@ -1383,6 +1384,7 @@ export type Database = {
           location_id?: number | null
           notes?: string | null
           order_number?: never
+          payment_method?: string | null
           profile_id?: string | null
           profile_order_id?: string
           status_order_id?: string | null
@@ -1402,6 +1404,7 @@ export type Database = {
           location_id?: number | null
           notes?: string | null
           order_number?: never
+          payment_method?: string | null
           profile_id?: string | null
           profile_order_id?: string
           status_order_id?: string | null
@@ -1933,6 +1936,10 @@ export type Database = {
           p_profile_id?: string
         }
         Returns: Json
+      }
+      replace_order_detail: {
+        Args: { p_items: Json; p_profile_order_id: string }
+        Returns: undefined
       }
       restock_order_stock: {
         Args: { p_profile_order_id: string }

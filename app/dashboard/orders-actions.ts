@@ -243,14 +243,9 @@ export async function updateManualOrder(input: {
   const discountTotal = isCourtesy ? subtotal : 0;
   const total = isCourtesy ? 0 : subtotal;
 
-  const { error: deleteErr } = await supabase
-    .from("order_detail")
-    .delete()
-    .eq("profile_order_id", parsed.data.profileOrderId);
-  if (deleteErr) return { error: deleteErr.message };
-
+  // Delete + insert en una sola transacción (RPC) — si dos guardados del mismo
+  // pedido se solapan, no queda hueco entre medio para que las líneas se dupliquen.
   const details = parsed.data.items.map((item) => ({
-    profile_order_id: parsed.data.profileOrderId,
     product_id: item.type === "product" ? item.itemId : null,
     combo_id: item.type === "combo" ? item.itemId : null,
     quantity: item.quantity,
@@ -258,7 +253,10 @@ export async function updateManualOrder(input: {
     line_total: item.price * item.quantity,
   }));
 
-  const { error: detailErr } = await supabase.from("order_detail").insert(details);
+  const { error: detailErr } = await supabase.rpc("replace_order_detail", {
+    p_profile_order_id: parsed.data.profileOrderId,
+    p_items: details,
+  });
   if (detailErr) return { error: detailErr.message };
 
   const { error: updateErr } = await supabase
@@ -277,6 +275,209 @@ export async function updateManualOrder(input: {
 
   revalidatePath("/dashboard");
   return { success: true, orderNumber: order.order_number };
+}
+
+// ─── Reporte de ventas (según filtros activos en Pedidos) ─────────────────────
+// Arma el ranking de productos/combos vendidos (excluye cancelados), detecta si
+// algún "socio" consumió algo, y separa el valor regalado en cortesías.
+
+export type OrdersReportFilters = { status: string; q: string; from: string; to: string };
+
+export type OrdersReportItem = {
+  key: string;
+  type: "product" | "combo";
+  name: string;
+  quantity: number;
+  revenue: number;
+  regularQuantity: number;
+  courtesyQuantity: number;
+  socioQuantity: number;
+};
+
+export type OrdersReportCategoryItem = {
+  key: string;
+  name: string;
+  quantity: number;
+  revenue: number;
+  regularQuantity: number;
+  courtesyQuantity: number;
+  socioQuantity: number;
+};
+
+export type CourtesyOrderDetail = {
+  orderNumber: number;
+  value: number;
+  reason: string | null;
+};
+
+export type OrdersReport = {
+  totalOrders: number;
+  totalRevenue: number;
+  regularOrders: number;
+  regularRevenue: number;
+  categories: OrdersReportCategoryItem[];
+  products: OrdersReportItem[];
+  courtesy: { count: number; value: number; orders: CourtesyOrderDetail[] };
+  socios: { count: number; value: number; products: OrdersReportItem[] };
+};
+
+export async function getOrdersReport(
+  filters: OrdersReportFilters,
+  truckId: number | null,
+): Promise<OrdersReport> {
+  const supabase = await createClient();
+
+  let truckLocationIds: number[] | null = null;
+  if (truckId) {
+    const allLocations = await getAccessibleLocations();
+    truckLocationIds = allLocations
+      .filter((l) => l.food_truck_id === truckId)
+      .map((l) => l.location_id);
+  }
+
+  let query = supabase
+    .from("profile_has_order")
+    .select(
+      `
+      profile_order_id, order_number, total, subtotal, is_courtesy, courtesy_reason, profile_id, created_at,
+      status_order(code),
+      order_detail(
+        quantity, unit_price, line_total,
+        product(product_id, name, category(name)),
+        combo(combo_id, name)
+      )
+    `,
+    )
+    .order("created_at", { ascending: false });
+
+  if (filters.status !== "all") query = query.eq("status_order_id", filters.status);
+  if (truckLocationIds) query = query.in("location_id", truckLocationIds);
+  if (filters.from) query = query.gte("created_at", new Date(`${filters.from}T00:00:00`).toISOString());
+  if (filters.to) query = query.lte("created_at", new Date(`${filters.to}T23:59:59`).toISOString());
+
+  if (filters.q) {
+    const q = filters.q.trim().replace(/[,()]/g, " ").trim();
+    const orderNumberMatch = /^\d+$/.test(q) ? Number(q) : null;
+    const { data: matchedProfiles } = await supabase
+      .from("profiles")
+      .select("id")
+      .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%`);
+    const matchingIds = (matchedProfiles ?? []).map((p) => p.id);
+
+    const orConditions: string[] = [];
+    if (matchingIds.length > 0) orConditions.push(`profile_id.in.(${matchingIds.join(",")})`);
+    if (orderNumberMatch !== null) orConditions.push(`order_number.eq.${orderNumberMatch}`);
+
+    query =
+      orConditions.length > 0
+        ? query.or(orConditions.join(","))
+        : query.eq("profile_order_id", "00000000-0000-0000-0000-000000000000");
+  }
+
+  const { data: rows } = await query;
+  const orders = (rows ?? []).filter((o) => {
+    const status = o.status_order as unknown as { code: string } | { code: string }[] | null;
+    const code = Array.isArray(status) ? status[0]?.code : status?.code;
+    return code !== "cancelled";
+  });
+
+  // ¿Cuáles profile_id son "socio"?
+  const profileIds = [...new Set(orders.map((o) => o.profile_id).filter((id): id is string => !!id))];
+  const socioIds = new Set<string>();
+  if (profileIds.length > 0) {
+    const { data: roleRows } = await supabase
+      .from("profile_has_role")
+      .select("profile_id, roles(code)")
+      .in("profile_id", profileIds);
+    (roleRows ?? []).forEach((r) => {
+      const role = r.roles as unknown as { code: string } | { code: string }[] | null;
+      const code = Array.isArray(role) ? role[0]?.code : role?.code;
+      if (code === "socio") socioIds.add(r.profile_id);
+    });
+  }
+
+  function aggregate(source: typeof orders): OrdersReportItem[] {
+    const map = new Map<string, OrdersReportItem>();
+    for (const order of source) {
+      const isSocioOrder = !!order.profile_id && socioIds.has(order.profile_id);
+      for (const line of order.order_detail ?? []) {
+        const product = Array.isArray(line.product) ? line.product[0] : line.product;
+        const combo = Array.isArray(line.combo) ? line.combo[0] : line.combo;
+        const type: "product" | "combo" = product ? "product" : "combo";
+        const id = product?.product_id ?? combo?.combo_id;
+        const name = product?.name ?? combo?.name ?? "Ítem eliminado";
+        if (id == null) continue;
+        const key = `${type}-${id}`;
+        const existing =
+          map.get(key) ??
+          { key, type, name, quantity: 0, revenue: 0, regularQuantity: 0, courtesyQuantity: 0, socioQuantity: 0 };
+        existing.quantity += line.quantity;
+        // La cortesía no genera ingreso real (el pedido queda en total=0) — no sumar su
+        // line_total (que guarda el valor previo al descuento) a los ingresos del reporte.
+        if (!order.is_courtesy) existing.revenue += line.line_total;
+        // Mutuamente excluyente: cortesía > socio > cliente regular (mismo criterio que regularOrders).
+        if (order.is_courtesy) existing.courtesyQuantity += line.quantity;
+        else if (isSocioOrder) existing.socioQuantity += line.quantity;
+        else existing.regularQuantity += line.quantity;
+        map.set(key, existing);
+      }
+    }
+    return [...map.values()].sort((a, b) => b.quantity - a.quantity);
+  }
+
+  function aggregateByCategory(source: typeof orders): OrdersReportCategoryItem[] {
+    const map = new Map<string, OrdersReportCategoryItem>();
+    for (const order of source) {
+      const isSocioOrder = !!order.profile_id && socioIds.has(order.profile_id);
+      for (const line of order.order_detail ?? []) {
+        const product = Array.isArray(line.product) ? line.product[0] : line.product;
+        const combo = Array.isArray(line.combo) ? line.combo[0] : line.combo;
+        const categoryRaw = product
+          ? (product as unknown as { category: { name: string } | { name: string }[] | null }).category
+          : null;
+        const category = Array.isArray(categoryRaw) ? categoryRaw[0] : categoryRaw;
+        const name = product ? (category?.name ?? "Sin categoría") : combo ? "Combos" : "Sin categoría";
+        const key = name;
+        const existing =
+          map.get(key) ??
+          { key, name, quantity: 0, revenue: 0, regularQuantity: 0, courtesyQuantity: 0, socioQuantity: 0 };
+        existing.quantity += line.quantity;
+        if (!order.is_courtesy) existing.revenue += line.line_total;
+        if (order.is_courtesy) existing.courtesyQuantity += line.quantity;
+        else if (isSocioOrder) existing.socioQuantity += line.quantity;
+        else existing.regularQuantity += line.quantity;
+        map.set(key, existing);
+      }
+    }
+    return [...map.values()].sort((a, b) => b.quantity - a.quantity);
+  }
+
+  const courtesyOrders = orders.filter((o) => o.is_courtesy);
+  const socioOrders = orders.filter((o) => o.profile_id && socioIds.has(o.profile_id));
+  const regularOrders = orders.filter((o) => !o.is_courtesy && !(o.profile_id && socioIds.has(o.profile_id)));
+
+  return {
+    totalOrders: orders.length,
+    totalRevenue: orders.reduce((acc, o) => acc + o.total, 0),
+    regularOrders: regularOrders.length,
+    regularRevenue: regularOrders.reduce((acc, o) => acc + o.total, 0),
+    categories: aggregateByCategory(orders),
+    products: aggregate(orders),
+    courtesy: {
+      count: courtesyOrders.length,
+      value: courtesyOrders.reduce((acc, o) => acc + o.subtotal, 0),
+      orders: courtesyOrders.map((o) => ({
+        orderNumber: o.order_number,
+        value: o.subtotal,
+        reason: o.courtesy_reason,
+      })),
+    },
+    socios: {
+      count: socioOrders.length,
+      value: socioOrders.reduce((acc, o) => acc + o.total, 0),
+      products: aggregate(socioOrders),
+    },
+  };
 }
 
 // ─── Eliminar pedido ────────────────────────────────────────────────────────
