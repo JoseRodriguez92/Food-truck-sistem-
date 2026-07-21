@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(ls ~/.ssh/)",
-      "Read(//c/Users/C N T/.ssh/**)"
+      "Read(//c/Users/C N T/.ssh/**)",
+      "mcp__supabase__list_projects"
     ]
   }
 }

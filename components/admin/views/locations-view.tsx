@@ -240,6 +240,7 @@ function LocationForm({
       city: "",
       country: "",
       food_truck_id: "",
+      estatus: true,
     },
   });
   const [geocoding, setGeocoding] = useState(false);
@@ -1138,7 +1139,7 @@ export function LocationsView({
                 city: editLoc.city ?? "",
                 country: editLoc.country ?? "",
                 food_truck_id: String(editLoc.food_truck_id),
-                estatus: editLoc.estatus,
+                estatus: editLoc.estatus ?? true,
                 latitude: editLoc.latitude ?? undefined,
                 longitude: editLoc.longitude ?? undefined,
               }}

@@ -36,6 +36,17 @@ export async function createLocation(formData: FormData) {
   };
 
   const supabase = await createClient();
+
+  // Un truck físicamente solo puede estar en un lugar — al activar esta
+  // ubicación, se desactiva cualquier otra activa de ese mismo truck.
+  if (payload.estatus) {
+    await supabase
+      .from("location")
+      .update({ estatus: false })
+      .eq("food_truck_id", payload.food_truck_id)
+      .eq("estatus", true);
+  }
+
   const { error } = await supabase.from("location").insert(payload);
   if (error) return { error: error.message };
   revalidatePath("/dashboard");
@@ -62,6 +73,18 @@ export async function updateLocation(locationId: number, formData: FormData) {
   };
 
   const supabase = await createClient();
+
+  // Un truck físicamente solo puede estar en un lugar — al activar esta
+  // ubicación, se desactiva cualquier otra activa de ese mismo truck.
+  if (payload.estatus) {
+    await supabase
+      .from("location")
+      .update({ estatus: false })
+      .eq("food_truck_id", payload.food_truck_id)
+      .eq("estatus", true)
+      .neq("location_id", locationId);
+  }
+
   const { error } = await supabase
     .from("location")
     .update(payload)

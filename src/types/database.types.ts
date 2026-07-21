@@ -14,45 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      batch_recipe: {
-        Row: {
-          batch_ingredient_id: number
-          batch_recipe_id: number
-          component_ingredient_id: number
-          created_at: string
-          quantity: number
-        }
-        Insert: {
-          batch_ingredient_id: number
-          batch_recipe_id?: never
-          component_ingredient_id: number
-          created_at?: string
-          quantity: number
-        }
-        Update: {
-          batch_ingredient_id?: number
-          batch_recipe_id?: never
-          component_ingredient_id?: number
-          created_at?: string
-          quantity?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "batch_recipe_batch_ingredient_id_fkey"
-            columns: ["batch_ingredient_id"]
-            isOneToOne: false
-            referencedRelation: "ingredient"
-            referencedColumns: ["ingredient_id"]
-          },
-          {
-            foreignKeyName: "batch_recipe_component_ingredient_id_fkey"
-            columns: ["component_ingredient_id"]
-            isOneToOne: false
-            referencedRelation: "ingredient"
-            referencedColumns: ["ingredient_id"]
-          },
-        ]
-      }
       category: {
         Row: {
           category_id: number
@@ -393,7 +354,6 @@ export type Database = {
           created_at: string
           description: string | null
           ingredient_id: number
-          is_batch: boolean
           name: string
           unit: string
         }
@@ -401,7 +361,6 @@ export type Database = {
           created_at?: string
           description?: string | null
           ingredient_id?: number
-          is_batch?: boolean
           name: string
           unit?: string
         }
@@ -409,7 +368,6 @@ export type Database = {
           created_at?: string
           description?: string | null
           ingredient_id?: number
-          is_batch?: boolean
           name?: string
           unit?: string
         }
@@ -1227,6 +1185,63 @@ export type Database = {
           },
         ]
       }
+      production_batch: {
+        Row: {
+          created_at: string
+          description: string | null
+          name: string
+          production_batch_id: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          name: string
+          production_batch_id?: never
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          name?: string
+          production_batch_id?: never
+        }
+        Relationships: []
+      }
+      production_batch_item: {
+        Row: {
+          ingredient_id: number
+          production_batch_id: number
+          production_batch_item_id: number
+          quantity: number
+        }
+        Insert: {
+          ingredient_id: number
+          production_batch_id: number
+          production_batch_item_id?: never
+          quantity: number
+        }
+        Update: {
+          ingredient_id?: number
+          production_batch_id?: number
+          production_batch_item_id?: never
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_batch_item_ingredient_id_fkey"
+            columns: ["ingredient_id"]
+            isOneToOne: false
+            referencedRelation: "ingredient"
+            referencedColumns: ["ingredient_id"]
+          },
+          {
+            foreignKeyName: "production_batch_item_production_batch_id_fkey"
+            columns: ["production_batch_id"]
+            isOneToOne: false
+            referencedRelation: "production_batch"
+            referencedColumns: ["production_batch_id"]
+          },
+        ]
+      }
       producto_has_insumo: {
         Row: {
           cantidad_requerida: number
@@ -1912,10 +1927,9 @@ export type Database = {
       }
       producir_lote: {
         Args: {
-          p_batch_ingredient_id: number
-          p_cantidad: number
           p_foodtruck_id: number
           p_notes?: string
+          p_production_batch_id: number
           p_profile_id?: string
         }
         Returns: Json

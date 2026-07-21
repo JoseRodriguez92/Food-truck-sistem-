@@ -40,38 +40,36 @@ export function BatchRecipeDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const [isPending, startTransition] = useTransition();
-  const [componentId, setComponentId] = useState("");
+  const [ingredientId, setIngredientId] = useState("");
   const [quantity, setQuantity] = useState("");
 
   if (!batch) return null;
 
-  const usedIds = new Set(batch.batch_recipe.map((r) => r.component_ingredient_id));
-  const pickable = allIngredients.filter(
-    (i) => i.ingredient_id !== batch.ingredient_id && !usedIds.has(i.ingredient_id),
-  );
+  const usedIds = new Set(batch.items.map((it) => it.ingredient_id));
+  const pickable = allIngredients.filter((i) => !usedIds.has(i.ingredient_id));
 
   function handleAdd() {
     const qty = parseFloat(quantity);
-    if (!componentId || !qty || qty <= 0) {
+    if (!ingredientId || !qty || qty <= 0) {
       toast.error("Selecciona un ingrediente y una cantidad válida");
       return;
     }
     startTransition(async () => {
-      const result = await saveBatchRecipeItem(batch!.ingredient_id, Number(componentId), qty);
+      const result = await saveBatchRecipeItem(batch!.production_batch_id, Number(ingredientId), qty);
       if (result?.error) toast.error(result.error);
       else {
-        toast.success("Ingrediente agregado a la receta");
-        setComponentId("");
+        toast.success("Ingrediente agregado al lote");
+        setIngredientId("");
         setQuantity("");
       }
     });
   }
 
-  function handleRemove(batchRecipeId: number) {
+  function handleRemove(productionBatchItemId: number) {
     startTransition(async () => {
-      const result = await removeBatchRecipeItem(batchRecipeId);
+      const result = await removeBatchRecipeItem(productionBatchItemId);
       if (result?.error) toast.error(result.error);
-      else toast.success("Quitado de la receta");
+      else toast.success("Ingrediente quitado");
     });
   }
 
@@ -79,25 +77,25 @@ export function BatchRecipeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Receta del lote — {batch.name}</DialogTitle>
+          <DialogTitle>Ingredientes del lote — {batch.name}</DialogTitle>
         </DialogHeader>
 
-        {batch.batch_recipe.length === 0 ? (
+        {batch.items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-2">
             <Layers className="w-8 h-8 opacity-20" />
-            <p className="text-sm">Sin ingredientes en la receta todavía</p>
+            <p className="text-sm">Sin ingredientes todavía</p>
           </div>
         ) : (
           <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
-            {batch.batch_recipe.map((r) => (
+            {batch.items.map((it) => (
               <div
-                key={r.batch_recipe_id}
+                key={it.production_batch_item_id}
                 className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{r.ingredient.name}</span>
+                  <span className="text-sm font-medium">{it.ingredient.name}</span>
                   <Badge variant="outline" className="text-xs font-mono">
-                    {r.quantity} {r.ingredient.unit}
+                    {it.quantity} {it.ingredient.unit}
                   </Badge>
                 </div>
                 <Button
@@ -105,7 +103,7 @@ export function BatchRecipeDialog({
                   size="icon"
                   className="h-7 w-7 hover:text-destructive"
                   disabled={isPending}
-                  onClick={() => handleRemove(r.batch_recipe_id)}
+                  onClick={() => handleRemove(it.production_batch_item_id)}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
@@ -117,14 +115,14 @@ export function BatchRecipeDialog({
         <div className="flex items-end gap-2 pt-2 border-t border-border">
           <div className="flex-1 space-y-1.5">
             <Label className="text-xs">Ingrediente</Label>
-            <Select value={componentId} onValueChange={setComponentId}>
+            <Select value={ingredientId} onValueChange={setIngredientId}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecciona..." />
               </SelectTrigger>
               <SelectContent>
                 {pickable.map((i) => (
                   <SelectItem key={i.ingredient_id} value={i.ingredient_id.toString()}>
-                    {i.name} {i.is_batch ? "(lote)" : ""}
+                    {i.name}
                   </SelectItem>
                 ))}
               </SelectContent>

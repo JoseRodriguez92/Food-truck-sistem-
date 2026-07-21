@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, ShoppingBag, Package, Layers, Plus, Minus, MapPin, Pencil, Loader2, Trash2, Store } from "lucide-react";
+import { Search, X, ShoppingBag, Package, Layers, Plus, Minus, MapPin, Pencil, Loader2, Trash2, Store, CalendarDays } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -117,12 +117,35 @@ function formatDateTime(iso: string) {
   });
 }
 
+function toDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+// Mismo mapeo de colores que components/client/order-status-badge.tsx, para
+// que el estado de un pedido se vea igual en el panel admin y en el tracker del cliente.
+const STATUS_STYLES: Record<string, string> = {
+  pending: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
+  confirmed: "bg-green-500/10 text-green-600 border-green-500/20",
+  preparing: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+  ready: "bg-primary/10 text-primary border-primary/20",
+  on_the_way: "bg-primary/10 text-primary border-primary/20",
+  delivered: "bg-green-500/10 text-green-600 border-green-500/20",
+  cancelled: "bg-destructive/10 text-destructive border-destructive/20",
+};
+
 function getStatusStyle(code: string) {
   const c = code.toLowerCase();
-  if (c.includes("pend")) return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
-  if (c.includes("prep") || c.includes("progress")) return "bg-blue-500/10 text-blue-600 border-blue-500/20";
-  if (c.includes("ready") || c.includes("listo")) return "bg-green-500/10 text-green-600 border-green-500/20";
-  if (c.includes("cancel")) return "bg-red-500/10 text-red-600 border-red-500/20";
+  if (STATUS_STYLES[c]) return STATUS_STYLES[c];
+  if (c.includes("pend")) return STATUS_STYLES.pending;
+  if (c.includes("confirm")) return STATUS_STYLES.confirmed;
+  if (c.includes("prep") || c.includes("progress")) return STATUS_STYLES.preparing;
+  if (c.includes("camino") || c.includes("way")) return STATUS_STYLES.on_the_way;
+  if (c.includes("entreg") || c.includes("deliver")) return STATUS_STYLES.delivered;
+  if (c.includes("ready") || c.includes("listo")) return STATUS_STYLES.ready;
+  if (c.includes("cancel") || c.includes("rechaz")) return STATUS_STYLES.cancelled;
   return "bg-muted text-muted-foreground border-border";
 }
 
@@ -379,6 +402,36 @@ export function OrdersView({
     router.push(`/dashboard?${params.toString()}`);
   }
 
+  function applyQuickRange(range: "today" | "last7" | "month") {
+    const today = new Date();
+
+    if (range === "today") {
+      const date = toDateInputValue(today);
+      setFrom(date);
+      setTo(date);
+      navigate({ from: date, to: date });
+      return;
+    }
+
+    if (range === "last7") {
+      const start = new Date(today);
+      start.setDate(today.getDate() - 6);
+      const fromDate = toDateInputValue(start);
+      const toDate = toDateInputValue(today);
+      setFrom(fromDate);
+      setTo(toDate);
+      navigate({ from: fromDate, to: toDate });
+      return;
+    }
+
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const fromDate = toDateInputValue(startOfMonth);
+    const toDate = toDateInputValue(today);
+    setFrom(fromDate);
+    setTo(toDate);
+    navigate({ from: fromDate, to: toDate });
+  }
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       <SectionHeader
@@ -434,15 +487,32 @@ export function OrdersView({
           />
         </div>
 
-        <div className="flex items-center justify-between">
-          <Button size="sm" onClick={() => navigate({ q })} className="gap-1.5">
-            <Search className="w-3.5 h-3.5" /> Buscar
-          </Button>
-          {hasActiveFilters && (
-            <Button size="sm" variant="ghost" onClick={clearFilters} className="gap-1.5 text-muted-foreground">
-              <X className="w-3.5 h-3.5" /> Limpiar filtros
+        <div className="flex flex-wrap items-center gap-2 justify-between">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button size="sm" onClick={() => navigate({ q })} className="gap-1.5">
+              <Search className="w-3.5 h-3.5" /> Buscar
             </Button>
-          )}
+            {hasActiveFilters && (
+              <Button size="sm" variant="ghost" onClick={clearFilters} className="gap-1.5 text-muted-foreground">
+                <X className="w-3.5 h-3.5" /> Limpiar
+              </Button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+              <CalendarDays className="w-3.5 h-3.5" /> Rango rápido:
+            </span>
+            <Button type="button" size="sm" variant="outline" onClick={() => applyQuickRange("today")}>
+              Hoy
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => applyQuickRange("last7")}>
+              7 días
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => applyQuickRange("month")}>
+              Este mes
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -598,12 +668,12 @@ export function OrdersView({
 
       {/* Detalle del pedido */}
       <Sheet open={!!detailOrder} onOpenChange={(o) => !o && closeDetail()}>
-        <SheetContent className="sm:max-w-md">
+        <SheetContent className="sm:max-w-md flex h-dvh flex-col">
           <SheetHeader>
             <SheetTitle>Pedido #{detailOrder?.order_number}</SheetTitle>
           </SheetHeader>
           {detailOrder && (
-            <div className="px-4 pb-4 space-y-4">
+            <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span suppressHydrationWarning>{formatDateTime(detailOrder.created_at)}</span>
                 <span className="flex items-center gap-1">
@@ -808,13 +878,15 @@ export function OrdersView({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button type="button" variant="outline" onClick={() => setIsEditing(false)} disabled={isSaving}>
-                      Cancelar
-                    </Button>
-                    <Button type="button" onClick={saveEdition} disabled={isSaving || editLines.length === 0}>
-                      {isSaving ? "Guardando..." : "Guardar cambios"}
-                    </Button>
+                  <div className="sticky bottom-0 -mx-4 px-4 pb-1 pt-3 bg-background border-t border-border">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button type="button" variant="outline" onClick={() => setIsEditing(false)} disabled={isSaving}>
+                        Cancelar
+                      </Button>
+                      <Button type="button" onClick={saveEdition} disabled={isSaving || editLines.length === 0}>
+                        {isSaving ? "Guardando..." : "Guardar cambios"}
+                      </Button>
+                    </div>
                   </div>
                 </>
               )}

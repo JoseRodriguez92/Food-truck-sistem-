@@ -21,7 +21,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
@@ -30,11 +29,17 @@ import {
   getLocationsForOrder,
   createManualOrder,
 } from "@/app/dashboard/orders-actions";
+import { useSelectedTruckStore } from "@/lib/store/selected-truck";
 
 type Customer = { id: string; first_name: string | null; last_name: string | null; email: string | null; isSocio: boolean };
 type CatalogItem = { id: number; name: string; price: number; partnerPrice: number | null; type: "product" | "combo" };
 type CartLine = CatalogItem & { quantity: number };
-type LocationOption = { location_id: number; name: string; food_truck: { name: string } | { name: string }[] | null };
+type LocationOption = {
+  location_id: number;
+  name: string;
+  food_truck_id: number;
+  food_truck: { name: string } | { name: string }[] | null;
+};
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("es-CO", {
@@ -51,10 +56,17 @@ function effectivePrice(item: CatalogItem, isPartnerPrice: boolean) {
 export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [isPending, startTransition] = useTransition();
 
-  // Ubicación
+  // Ubicación — el truck activo es el del sidebar (única fuente de verdad, lib/store/selected-truck.ts).
+  // Acá solo resolvemos a qué ubicación de ESE truck corresponde el pedido.
+  const selectedTruck = useSelectedTruckStore((s) => s.selectedTruck);
   const [locations, setLocations] = useState<LocationOption[]>([]);
   const [locationsLoading, setLocationsLoading] = useState(false);
   const [locationId, setLocationId] = useState<string>("");
+
+  const truckLocations = useMemo(
+    () => locations.filter((loc) => loc.food_truck_id === selectedTruck),
+    [locations, selectedTruck],
+  );
 
   // Cliente
   const [customerMode, setCustomerMode] = useState<"walkin" | "search">("walkin");
@@ -94,6 +106,16 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
       setLocationsLoading(false);
     });
   }, [open]);
+
+  // El truck ya quedó definido en el sidebar — acá solo resolvemos la ubicación.
+  // Si el truck tiene una sola, se autoselecciona (no se vuelve a preguntar).
+  useEffect(() => {
+    if (truckLocations.length === 1) {
+      setLocationId(String(truckLocations[0].location_id));
+    } else {
+      setLocationId("");
+    }
+  }, [truckLocations]);
 
   useEffect(() => {
     if (customerMode !== "search" || !customerQuery.trim()) {
@@ -189,25 +211,31 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-5 px-1">
-          {/* Ubicación */}
+          {/* Ubicación — derivada del truck activo (sidebar), no se vuelve a preguntar */}
           <div className="space-y-2">
             <Label>Ubicación</Label>
-            <Select value={locationId} onValueChange={setLocationId} disabled={locationsLoading}>
-              <SelectTrigger className="w-full">
+            {!selectedTruck ? (
+              <p className="text-xs text-muted-foreground rounded-lg border border-border px-3 py-2">
+                Elegí un truck arriba en el sidebar para tomar el pedido.
+              </p>
+            ) : locationsLoading ? (
+              <p className="text-xs text-muted-foreground rounded-lg border border-border px-3 py-2">Cargando...</p>
+            ) : truckLocations.length === 0 ? (
+              <p className="text-xs text-destructive rounded-lg border border-destructive/30 px-3 py-2">
+                Ese truck no tiene ubicaciones configuradas.
+              </p>
+            ) : truckLocations.length === 1 ? (
+              <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
                 <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                <SelectValue placeholder={locationsLoading ? "Cargando..." : "¿Dónde es el pedido?"} />
-              </SelectTrigger>
-              <SelectContent>
-                {locations.map((loc) => {
-                  const truck = Array.isArray(loc.food_truck) ? loc.food_truck[0] : loc.food_truck;
-                  return (
-                    <SelectItem key={loc.location_id} value={String(loc.location_id)}>
-                      {loc.name}{truck?.name ? ` — ${truck.name}` : ""}
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+                {truckLocations[0].name}
+              </div>
+            ) : (
+              // Un truck no debería tener más de una ubicación activa a la vez.
+              // Si esto se ve, hay datos inconsistentes — se corrige en Ubicaciones, no acá.
+              <p className="text-xs text-destructive rounded-lg border border-destructive/30 px-3 py-2">
+                Ese truck tiene más de una ubicación activa. Corregilo en Ubicaciones antes de tomar el pedido.
+              </p>
+            )}
           </div>
 
           {/* Cliente */}

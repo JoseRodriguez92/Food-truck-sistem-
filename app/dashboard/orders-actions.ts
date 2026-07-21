@@ -72,10 +72,12 @@ export async function getAccessibleLocations() {
 
   const admin = await isCurrentUserAdmin(supabase, user.id);
 
+  // Historial completo (activas e inactivas) — se usa para filtrar pedidos
+  // viejos por truck, aunque la ubicación de ese pedido ya no esté activa hoy.
   if (admin) {
     const { data } = await supabase
       .from("location")
-      .select("location_id, name, food_truck_id, food_truck(name)")
+      .select("location_id, name, food_truck_id, estatus, food_truck(name)")
       .order("name");
     return data ?? [];
   }
@@ -89,15 +91,17 @@ export async function getAccessibleLocations() {
 
   const { data } = await supabase
     .from("location")
-    .select("location_id, name, food_truck_id, food_truck(name)")
+    .select("location_id, name, food_truck_id, estatus, food_truck(name)")
     .in("food_truck_id", truckIds)
     .order("name");
   return data ?? [];
 }
 
-// Alias con nombre más explícito para el picker del diálogo "Nuevo pedido"
+// Para el picker del diálogo "Nuevo pedido" — un truck solo puede estar en
+// una ubicación a la vez, así que acá sí filtramos a la activa (estatus = true).
 export async function getLocationsForOrder() {
-  return getAccessibleLocations();
+  const all = await getAccessibleLocations();
+  return all.filter((l) => (l as { estatus?: boolean }).estatus !== false);
 }
 
 // ─── Crear pedido manual (mostrador) ───────────────────────────────────────────

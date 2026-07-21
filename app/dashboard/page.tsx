@@ -98,9 +98,11 @@ export default async function DashboardPage({
       ]);
 
       // Truck activo en el sidebar → limita los pedidos a las ubicaciones de ese truck.
+      // Si el truck no tiene ninguna ubicación, debe mostrar 0 pedidos — no el listado sin filtrar.
       const truckLocationIds = truckFilter
         ? (allLocations ?? []).filter((l) => l.food_truck_id === truckFilter).map((l) => l.location_id)
         : null;
+      const canApplyTruckFilter = !!truckFilter;
 
       let query = supabase
         .from("profile_has_order")
@@ -121,7 +123,7 @@ export default async function DashboardPage({
         .order("created_at", { ascending: false });
 
       if (statusFilter !== "all") query = query.eq("status_order_id", statusFilter);
-      if (truckLocationIds) query = query.in("location_id", truckLocationIds.length ? truckLocationIds : [-1]);
+      if (canApplyTruckFilter) query = query.in("location_id", truckLocationIds ?? []);
       if (from) query = query.gte("created_at", new Date(`${from}T00:00:00`).toISOString());
       if (to) query = query.lte("created_at", new Date(`${to}T23:59:59`).toISOString());
 
@@ -175,7 +177,7 @@ export default async function DashboardPage({
           .order("created_at", { ascending: false });
 
         if (statusFilter !== "all") legacyQuery.eq("status_order_id", statusFilter);
-        if (truckLocationIds) legacyQuery.in("location_id", truckLocationIds.length ? truckLocationIds : [-1]);
+        if (canApplyTruckFilter) legacyQuery.in("location_id", truckLocationIds ?? []);
         if (from) legacyQuery.gte("created_at", new Date(`${from}T00:00:00`).toISOString());
         if (to) legacyQuery.lte("created_at", new Date(`${to}T23:59:59`).toISOString());
 
@@ -354,19 +356,18 @@ export default async function DashboardPage({
     case "catalog.lotes": {
       const [{ data: batches }, { data: allIngredients }] = await Promise.all([
         supabase
-          .from("ingredient")
+          .from("production_batch")
           .select(
             `
-            ingredient_id, name, unit, description, created_at,
-            batch_recipe!batch_recipe_batch_ingredient_id_fkey(
-              batch_recipe_id, component_ingredient_id, quantity,
-              ingredient:ingredient!batch_recipe_component_ingredient_id_fkey(ingredient_id, name, unit)
+            production_batch_id, name, description, created_at,
+            items:production_batch_item(
+              production_batch_item_id, ingredient_id, quantity,
+              ingredient(ingredient_id, name, unit)
             )
           `,
           )
-          .eq("is_batch", true)
           .order("name"),
-        supabase.from("ingredient").select("ingredient_id, name, unit, is_batch").order("name"),
+        supabase.from("ingredient").select("ingredient_id, name, unit").order("name"),
       ]);
 
       return (
