@@ -28,18 +28,54 @@ export async function searchCustomers(query: string) {
 }
 
 // ─── Catálogo de productos/combos para armar el pedido ────────────────────────
+// Se limita al menú (o menús) asignado a la ubicación elegida — no todo el catálogo global.
 
-export async function getCatalogForOrder() {
+function toSingleRel<T>(v: T | T[] | null | undefined): T | null {
+  if (!v) return null;
+  return Array.isArray(v) ? (v[0] ?? null) : v;
+}
+
+export async function getCatalogForOrder(locationId?: number) {
   const supabase = await createClient();
 
-  const [{ data: products }, { data: combos }] = await Promise.all([
-    supabase.from("product").select("product_id, name, price, partner_price").order("name"),
-    supabase.from("combo").select("combo_id, name, price").eq("active", true).order("name"),
+  if (!locationId) return { products: [], combos: [] };
+
+  const { data: locationMenus } = await supabase
+    .from("location_has_menu")
+    .select("menu_id")
+    .eq("location_id", locationId);
+  const menuIds = (locationMenus ?? []).map((lm) => lm.menu_id);
+  if (menuIds.length === 0) return { products: [], combos: [] };
+
+  const [{ data: menuProducts }, { data: menuCombos }] = await Promise.all([
+    supabase
+      .from("menu_has_product")
+      .select("product(product_id, name, price, partner_price)")
+      .in("menu_id", menuIds),
+    supabase
+      .from("menu_has_combo")
+      .select("combo(combo_id, name, price, active)")
+      .in("menu_id", menuIds),
   ]);
 
+  type ProductRow = { product_id: number; name: string; price: number; partner_price: number | null };
+  type ComboRow = { combo_id: number; name: string; price: number; active: boolean };
+
+  const productsById = new Map<number, ProductRow>();
+  for (const mp of menuProducts ?? []) {
+    const p = toSingleRel<ProductRow>(mp.product as ProductRow | ProductRow[] | null);
+    if (p) productsById.set(p.product_id, p);
+  }
+
+  const combosById = new Map<number, { combo_id: number; name: string; price: number }>();
+  for (const mc of menuCombos ?? []) {
+    const c = toSingleRel<ComboRow>(mc.combo as ComboRow | ComboRow[] | null);
+    if (c && c.active) combosById.set(c.combo_id, { combo_id: c.combo_id, name: c.name, price: c.price });
+  }
+
   return {
-    products: products ?? [],
-    combos: combos ?? [],
+    products: [...productsById.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    combos: [...combosById.values()].sort((a, b) => a.name.localeCompare(b.name)),
   };
 }
 

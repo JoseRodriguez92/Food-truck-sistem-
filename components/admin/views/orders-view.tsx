@@ -231,7 +231,7 @@ export function OrdersView({
     if (!isEditing || !detailOrder) return;
     let cancelled = false;
     setCatalogLoading(true);
-    getCatalogForOrder()
+    getCatalogForOrder(detailOrder.location_id ?? undefined)
       .then(({ products, combos }) => {
         if (cancelled) return;
         setCatalog([

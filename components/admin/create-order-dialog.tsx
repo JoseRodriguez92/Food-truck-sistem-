@@ -91,21 +91,31 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
 
   useEffect(() => {
     if (!open) return;
-    setCatalogLoading(true);
-    getCatalogForOrder().then(({ products, combos }) => {
-      setCatalog([
-        ...products.map((p) => ({ id: p.product_id, name: p.name, price: p.price, partnerPrice: p.partner_price, type: "product" as const })),
-        ...combos.map((c) => ({ id: c.combo_id, name: c.name, price: c.price, partnerPrice: null, type: "combo" as const })),
-      ]);
-      setCatalogLoading(false);
-    });
-
     setLocationsLoading(true);
     getLocationsForOrder().then((data) => {
       setLocations(data as LocationOption[]);
       setLocationsLoading(false);
     });
   }, [open]);
+
+  // El catálogo depende de la ubicación: se limita al menú asignado a esa ubicación,
+  // no a todo el catálogo del sistema. Si cambia (ej. cambio de truck a mitad de
+  // pedido), el carrito se vacía porque puede tener items que ya no aplican.
+  useEffect(() => {
+    setCart([]);
+    if (!open || !locationId) {
+      setCatalog([]);
+      return;
+    }
+    setCatalogLoading(true);
+    getCatalogForOrder(Number(locationId)).then(({ products, combos }) => {
+      setCatalog([
+        ...products.map((p) => ({ id: p.product_id, name: p.name, price: p.price, partnerPrice: p.partner_price, type: "product" as const })),
+        ...combos.map((c) => ({ id: c.combo_id, name: c.name, price: c.price, partnerPrice: null, type: "combo" as const })),
+      ]);
+      setCatalogLoading(false);
+    });
+  }, [open, locationId]);
 
   // El truck ya quedó definido en el sidebar — acá solo resolvemos la ubicación.
   // Si el truck tiene una sola, se autoselecciona (no se vuelve a preguntar).
@@ -345,8 +355,12 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
                   <div className="p-4 text-xs text-muted-foreground flex items-center gap-2">
                     <Loader2 className="w-3 h-3 animate-spin" /> Cargando catálogo...
                   </div>
+                ) : !locationId ? (
+                  <p className="p-4 text-xs text-muted-foreground">Elegí un truck con ubicación para ver su menú</p>
                 ) : filteredCatalog.length === 0 ? (
-                  <p className="p-4 text-xs text-muted-foreground">Sin resultados</p>
+                  <p className="p-4 text-xs text-muted-foreground">
+                    {catalog.length === 0 ? "Esta ubicación no tiene menú asignado" : "Sin resultados"}
+                  </p>
                 ) : (
                   <div className="divide-y divide-border">
                     {filteredCatalog.map((item) => {
