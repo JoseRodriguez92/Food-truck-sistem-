@@ -191,7 +191,7 @@ export function OrdersReportDialog({
             <Loader2 className="w-4 h-4 animate-spin" /> Calculando reporte...
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto space-y-5 pr-1">
+          <div className="flex-1 overflow-y-auto space-y-5 px-4 scrollbar-brand">
             {/* Resumen — fila de stats */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <StatCard icon={ShoppingBag} label="Pedidos (sin cancelados)" value={String(report.totalOrders)} />

@@ -17,6 +17,7 @@ import {
   Eye,
   FileText,
   Printer,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
@@ -26,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -71,9 +72,9 @@ import {
   createMenu,
   updateMenu,
   deleteMenu,
-  addProductToMenu,
+  addProductsToMenu,
   removeProductFromMenu,
-  addComboToMenu,
+  addCombosToMenu,
   removeComboFromMenu,
 } from "@/app/admin/menus/actions";
 import { SectionHeader } from "@/components/admin/section-header";
@@ -256,8 +257,10 @@ function MenuContentPanel({
   onClose: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
-  const [selProduct, setSelProduct] = useState("");
-  const [selCombo, setSelCombo] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [comboSearch, setComboSearch] = useState("");
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<number>>(new Set());
+  const [selectedComboIds, setSelectedComboIds] = useState<Set<number>>(new Set());
 
   const usedProductIds = new Set(
     menu.menu_has_product.map((mp) => mp.product_id),
@@ -269,15 +272,70 @@ function MenuContentPanel({
   const availableCombos = allCombos.filter(
     (c) => !usedComboIds.has(c.combo_id),
   );
+  const filteredAvailableProducts = availableProducts.filter((p) =>
+    p.name.toLowerCase().includes(productSearch.trim().toLowerCase()),
+  );
+  const filteredAvailableCombos = availableCombos.filter((c) =>
+    c.name.toLowerCase().includes(comboSearch.trim().toLowerCase()),
+  );
+  const allFilteredProductsSelected =
+    filteredAvailableProducts.length > 0 &&
+    filteredAvailableProducts.every((p) => selectedProductIds.has(p.product_id));
+  const allFilteredCombosSelected =
+    filteredAvailableCombos.length > 0 &&
+    filteredAvailableCombos.every((c) => selectedComboIds.has(c.combo_id));
 
-  function handleAddProduct() {
-    if (!selProduct) return;
+  function toggleProduct(id: number) {
+    setSelectedProductIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleCombo(id: number) {
+    setSelectedComboIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllProducts() {
+    setSelectedProductIds((prev) => {
+      if (allFilteredProductsSelected) {
+        const next = new Set(prev);
+        filteredAvailableProducts.forEach((p) => next.delete(p.product_id));
+        return next;
+      }
+      const next = new Set(prev);
+      filteredAvailableProducts.forEach((p) => next.add(p.product_id));
+      return next;
+    });
+  }
+
+  function toggleSelectAllCombos() {
+    setSelectedComboIds((prev) => {
+      if (allFilteredCombosSelected) {
+        const next = new Set(prev);
+        filteredAvailableCombos.forEach((c) => next.delete(c.combo_id));
+        return next;
+      }
+      const next = new Set(prev);
+      filteredAvailableCombos.forEach((c) => next.add(c.combo_id));
+      return next;
+    });
+  }
+
+  function handleAddSelectedProducts() {
+    if (selectedProductIds.size === 0) return;
+    const ids = [...selectedProductIds];
     startTransition(async () => {
-      const result = await addProductToMenu(menu.menu_id, Number(selProduct));
+      const result = await addProductsToMenu(menu.menu_id, ids);
       if (result?.error) toast.error(result.error);
       else {
-        toast.success("Producto agregado");
-        setSelProduct("");
+        toast.success(`${ids.length} producto${ids.length !== 1 ? "s" : ""} agregado${ids.length !== 1 ? "s" : ""}`);
+        setSelectedProductIds(new Set());
       }
     });
   }
@@ -290,14 +348,15 @@ function MenuContentPanel({
     });
   }
 
-  function handleAddCombo() {
-    if (!selCombo) return;
+  function handleAddSelectedCombos() {
+    if (selectedComboIds.size === 0) return;
+    const ids = [...selectedComboIds];
     startTransition(async () => {
-      const result = await addComboToMenu(menu.menu_id, Number(selCombo));
+      const result = await addCombosToMenu(menu.menu_id, ids);
       if (result?.error) toast.error(result.error);
       else {
-        toast.success("Combo agregado");
-        setSelCombo("");
+        toast.success(`${ids.length} combo${ids.length !== 1 ? "s" : ""} agregado${ids.length !== 1 ? "s" : ""}`);
+        setSelectedComboIds(new Set());
       }
     });
   }
@@ -312,7 +371,7 @@ function MenuContentPanel({
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="w-[80dvw] sm:max-w-[80dvw] max-h-[85dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Contenido — {menu.name}</DialogTitle>
         </DialogHeader>
@@ -336,212 +395,288 @@ function MenuContentPanel({
           </TabsList>
 
           {/* Tab Productos */}
-          <TabsContent value="products" className="space-y-3 mt-4">
-            <div className="flex gap-2">
-              <Select
-                value={selProduct}
-                onValueChange={setSelProduct}
-                disabled={availableProducts.length === 0}
-              >
-                <SelectTrigger className="flex-1">
-                  <SelectValue
-                    placeholder={
-                      availableProducts.length === 0
-                        ? "Todos los productos ya están"
-                        : "Agregar producto..."
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableProducts.map((p) => (
-                    <SelectItem key={p.product_id} value={String(p.product_id)}>
-                      <span className="flex items-center justify-between gap-4 w-full">
-                        <span>{p.name}</span>
-                        <span className="text-muted-foreground text-xs">
-                          {formatCurrency(p.price)}
-                        </span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                size="icon"
-                onClick={handleAddProduct}
-                disabled={isPending || !selProduct}
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
-            </div>
-            <Separator />
-            {menu.menu_has_product.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">
-                Sin productos en este menú
-              </p>
-            ) : (
-              <div className="space-y-1.5 max-h-60 overflow-y-auto">
-                {menu.menu_has_product.map((mp) => {
-                  const p = toSingle(
-                    mp.product as
-                      | MenuProduct["product"]
-                      | MenuProduct["product"][],
-                  );
-                  const img = p?.product_has_image?.[0];
-                  return (
-                    <div
-                      key={mp.menu_product_id}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg bg-accent/50 group"
-                    >
-                      <div className="w-9 h-9 rounded-md overflow-hidden shrink-0 bg-muted border border-border">
-                        {img ? (
-                          <Image
-                            src={img.image_url}
-                            alt={p?.name ?? ""}
-                            width={36}
-                            height={36}
-                            className="object-cover w-full h-full"
-                            unoptimized
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Package className="w-4 h-4 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {p?.name ?? "—"}
-                        </p>
-                        {p && (
-                          <p className="text-xs text-muted-foreground">
-                            {formatCurrency(p.price)}
-                          </p>
-                        )}
+          <TabsContent value="products" className="mt-4">
+            <div className="grid lg:grid-cols-2 gap-5">
+              {/* Panel izquierdo: agregar */}
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-muted-foreground/70 uppercase tracking-widest">
+                  Agregar al menú
+                </p>
+                {availableProducts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4 border border-border rounded-lg">
+                    Todos los productos ya están en este menú
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                        <Input
+                          placeholder="Buscar producto..."
+                          value={productSearch}
+                          onChange={(e) => setProductSearch(e.target.value)}
+                          className="pl-8 h-8 text-sm"
+                        />
                       </div>
                       <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"
-                        disabled={isPending}
-                        onClick={() =>
-                          handleRemoveProduct(mp.menu_product_id, p?.name ?? "")
-                        }
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 shrink-0"
+                        onClick={toggleSelectAllProducts}
                       >
-                        <X className="w-3.5 h-3.5" />
+                        {allFilteredProductsSelected ? "Ninguno" : "Todos"}
                       </Button>
                     </div>
-                  );
-                })}
+
+                    <div className="rounded-lg border border-border h-72 overflow-y-auto divide-y divide-border">
+                      {filteredAvailableProducts.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">Sin resultados</p>
+                      ) : (
+                        filteredAvailableProducts.map((p) => (
+                          <label
+                            key={p.product_id}
+                            className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-accent/50 transition-colors"
+                          >
+                            <Checkbox
+                              checked={selectedProductIds.has(p.product_id)}
+                              onCheckedChange={() => toggleProduct(p.product_id)}
+                            />
+                            <span className="flex-1 text-sm truncate">{p.name}</span>
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {formatCurrency(p.price)}
+                            </span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+
+                    <Button
+                      className="w-full gap-2"
+                      size="sm"
+                      disabled={isPending || selectedProductIds.size === 0}
+                      onClick={handleAddSelectedProducts}
+                    >
+                      <Plus className="w-4 h-4" />
+                      Agregar seleccionados{selectedProductIds.size > 0 ? ` (${selectedProductIds.size})` : ""}
+                    </Button>
+                  </>
+                )}
               </div>
-            )}
+
+              {/* Panel derecho: ya en el menú */}
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-muted-foreground/70 uppercase tracking-widest">
+                  En este menú
+                </p>
+                {menu.menu_has_product.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4 border border-border rounded-lg">
+                    Sin productos en este menú
+                  </p>
+                ) : (
+                  <div className="space-y-1.5 h-72 overflow-y-auto pr-1">
+                    {menu.menu_has_product.map((mp) => {
+                      const p = toSingle(
+                        mp.product as
+                          | MenuProduct["product"]
+                          | MenuProduct["product"][],
+                      );
+                      const img = p?.product_has_image?.[0];
+                      return (
+                        <div
+                          key={mp.menu_product_id}
+                          className="flex items-center gap-3 px-3 py-2 rounded-lg bg-card border border-border group"
+                        >
+                          <div className="w-9 h-9 rounded-md overflow-hidden shrink-0 bg-muted border border-border">
+                            {img ? (
+                              <Image
+                                src={img.image_url}
+                                alt={p?.name ?? ""}
+                                width={36}
+                                height={36}
+                                className="object-cover w-full h-full"
+                                unoptimized
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Package className="w-4 h-4 text-muted-foreground" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {p?.name ?? "—"}
+                            </p>
+                            {p && (
+                              <p className="text-xs text-muted-foreground">
+                                {formatCurrency(p.price)}
+                              </p>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"
+                            disabled={isPending}
+                            onClick={() =>
+                              handleRemoveProduct(mp.menu_product_id, p?.name ?? "")
+                            }
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
           </TabsContent>
 
           {/* Tab Combos */}
-          <TabsContent value="combos" className="space-y-3 mt-4">
-            <div className="flex gap-2">
-              <Select
-                value={selCombo}
-                onValueChange={setSelCombo}
-                disabled={availableCombos.length === 0}
-              >
-                <SelectTrigger className="flex-1">
-                  <SelectValue
-                    placeholder={
-                      availableCombos.length === 0
-                        ? "Todos los combos ya están"
-                        : "Agregar combo..."
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableCombos.map((c) => (
-                    <SelectItem key={c.combo_id} value={String(c.combo_id)}>
-                      <span className="flex items-center justify-between gap-4 w-full">
-                        <span>{c.name}</span>
-                        <span className="text-muted-foreground text-xs">
-                          {formatCurrency(c.price)}
-                        </span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                size="icon"
-                onClick={handleAddCombo}
-                disabled={isPending || !selCombo}
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
-            </div>
-            <Separator />
-            {menu.menu_has_combo.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">
-                Sin combos en este menú
-              </p>
-            ) : (
-              <div className="space-y-1.5 max-h-60 overflow-y-auto">
-                {menu.menu_has_combo.map((mc) => {
-                  const c = toSingle(
-                    mc.combo as MenuCombo["combo"] | MenuCombo["combo"][],
-                  );
-                  const img = c?.combo_has_product?.[0];
-                  const firstImg = img
-                    ? toSingle(
-                        (
-                          img.product as {
-                            product_has_image: ProductImage[];
-                          } | null
-                        )?.product_has_image,
-                      )
-                    : null;
-                  return (
-                    <div
-                      key={mc.menu_combo_id}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg bg-accent/50 group"
-                    >
-                      <div className="w-9 h-9 rounded-md overflow-hidden shrink-0 bg-muted border border-border">
-                        {firstImg ? (
-                          <Image
-                            src={(firstImg as ProductImage).image_url}
-                            alt={c?.name ?? ""}
-                            width={36}
-                            height={36}
-                            className="object-cover w-full h-full"
-                            unoptimized
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Layers className="w-4 h-4 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {c?.name ?? "—"}
-                        </p>
-                        {c && (
-                          <p className="text-xs text-muted-foreground">
-                            {formatCurrency(c.price)}
-                          </p>
-                        )}
+          <TabsContent value="combos" className="mt-4">
+            <div className="grid lg:grid-cols-2 gap-5">
+              {/* Panel izquierdo: agregar */}
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-muted-foreground/70 uppercase tracking-widest">
+                  Agregar al menú
+                </p>
+                {availableCombos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4 border border-border rounded-lg">
+                    Todos los combos ya están en este menú
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                        <Input
+                          placeholder="Buscar combo..."
+                          value={comboSearch}
+                          onChange={(e) => setComboSearch(e.target.value)}
+                          className="pl-8 h-8 text-sm"
+                        />
                       </div>
                       <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"
-                        disabled={isPending}
-                        onClick={() =>
-                          handleRemoveCombo(mc.menu_combo_id, c?.name ?? "")
-                        }
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 shrink-0"
+                        onClick={toggleSelectAllCombos}
                       >
-                        <X className="w-3.5 h-3.5" />
+                        {allFilteredCombosSelected ? "Ninguno" : "Todos"}
                       </Button>
                     </div>
-                  );
-                })}
+
+                    <div className="rounded-lg border border-border h-72 overflow-y-auto divide-y divide-border">
+                      {filteredAvailableCombos.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">Sin resultados</p>
+                      ) : (
+                        filteredAvailableCombos.map((c) => (
+                          <label
+                            key={c.combo_id}
+                            className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-accent/50 transition-colors"
+                          >
+                            <Checkbox
+                              checked={selectedComboIds.has(c.combo_id)}
+                              onCheckedChange={() => toggleCombo(c.combo_id)}
+                            />
+                            <span className="flex-1 text-sm truncate">{c.name}</span>
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {formatCurrency(c.price)}
+                            </span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+
+                    <Button
+                      className="w-full gap-2"
+                      size="sm"
+                      disabled={isPending || selectedComboIds.size === 0}
+                      onClick={handleAddSelectedCombos}
+                    >
+                      <Plus className="w-4 h-4" />
+                      Agregar seleccionados{selectedComboIds.size > 0 ? ` (${selectedComboIds.size})` : ""}
+                    </Button>
+                  </>
+                )}
               </div>
-            )}
+
+              {/* Panel derecho: ya en el menú */}
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-muted-foreground/70 uppercase tracking-widest">
+                  En este menú
+                </p>
+                {menu.menu_has_combo.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4 border border-border rounded-lg">
+                    Sin combos en este menú
+                  </p>
+                ) : (
+                  <div className="space-y-1.5 h-72 overflow-y-auto pr-1">
+                    {menu.menu_has_combo.map((mc) => {
+                      const c = toSingle(
+                        mc.combo as MenuCombo["combo"] | MenuCombo["combo"][],
+                      );
+                      const img = c?.combo_has_product?.[0];
+                      const firstImg = img
+                        ? toSingle(
+                            (
+                              img.product as {
+                                product_has_image: ProductImage[];
+                              } | null
+                            )?.product_has_image,
+                          )
+                        : null;
+                      return (
+                        <div
+                          key={mc.menu_combo_id}
+                          className="flex items-center gap-3 px-3 py-2 rounded-lg bg-card border border-border group"
+                        >
+                          <div className="w-9 h-9 rounded-md overflow-hidden shrink-0 bg-muted border border-border">
+                            {firstImg ? (
+                              <Image
+                                src={(firstImg as ProductImage).image_url}
+                                alt={c?.name ?? ""}
+                                width={36}
+                                height={36}
+                                className="object-cover w-full h-full"
+                                unoptimized
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Layers className="w-4 h-4 text-muted-foreground" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {c?.name ?? "—"}
+                            </p>
+                            {c && (
+                              <p className="text-xs text-muted-foreground">
+                                {formatCurrency(c.price)}
+                              </p>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"
+                            disabled={isPending}
+                            onClick={() =>
+                              handleRemoveCombo(mc.menu_combo_id, c?.name ?? "")
+                            }
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
 

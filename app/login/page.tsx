@@ -2,10 +2,12 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LoginForm } from "./login-form";
 
-function redirectByRole(roleName: string): string {
-  const r = roleName.toLowerCase().trim();
-  if (r === "admin" || r === "employ") return "/dashboard";
-  return "/client";
+// admin/employ/socio entran al panel — el resto (o sin rol) va al menú del cliente.
+function hasDashboardAccess(roleNames: string[]): boolean {
+  return roleNames.some((r) => {
+    const code = r.toLowerCase().trim();
+    return code === "admin" || code === "employ" || code === "socio";
+  });
 }
 
 export default async function LoginPage({
@@ -20,16 +22,19 @@ export default async function LoginPage({
   if (session) {
     if (redirectTo?.startsWith("/")) redirect(redirectTo);
 
-    const { data: roleData } = await supabase
+    // Un usuario puede tener varios roles — alcanza con que uno dé acceso al panel.
+    const { data: roleRows } = await supabase
       .from("profile_has_role")
       .select("roles(name)")
-      .eq("profile_id", session.user.id)
-      .limit(1)
-      .single();
+      .eq("profile_id", session.user.id);
 
-    const rolesRaw = roleData?.roles as unknown as { name: string } | { name: string }[] | null;
-    const roleName = (Array.isArray(rolesRaw) ? rolesRaw[0] : rolesRaw)?.name ?? "customer";
-    redirect(redirectByRole(roleName));
+    const roleNames = (roleRows ?? []).map((r) => {
+      const roles = r.roles as unknown as { name: string } | { name: string }[] | null;
+      const role = Array.isArray(roles) ? roles[0] : roles;
+      return role?.name ?? "";
+    });
+
+    redirect(hasDashboardAccess(roleNames) ? "/dashboard" : "/client");
   }
 
   return <LoginForm redirectTo={redirectTo} />;

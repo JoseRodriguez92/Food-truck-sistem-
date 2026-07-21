@@ -17,7 +17,7 @@ export default async function AdminLayout({
 
   if (!user) redirect("/login");
 
-  // Verificar rol — un usuario puede tener varios roles, alcanza con que uno sea admin/employ
+  // Verificar rol — un usuario puede tener varios roles, alcanza con que uno sea admin/employ/socio
   const { data: roleRows } = await supabase
     .from("profile_has_role")
     .select("roles(name)")
@@ -27,7 +27,7 @@ export default async function AdminLayout({
     const roles = r.roles as unknown as { name: string } | { name: string }[] | null;
     const role = Array.isArray(roles) ? roles[0] : roles;
     const code = role?.name?.toLowerCase();
-    return code === "admin" || code === "employ";
+    return code === "admin" || code === "employ" || code === "socio";
   });
   if (!hasAccess) redirect("/client");
 

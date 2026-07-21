@@ -53,6 +53,16 @@ export async function addProductToMenu(menuId: number, productId: number) {
   revalidatePath("/dashboard");
 }
 
+export async function addProductsToMenu(menuId: number, productIds: number[]) {
+  if (productIds.length === 0) return { error: "Seleccioná al menos un producto" };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("menu_has_product")
+    .insert(productIds.map((product_id) => ({ menu_id: menuId, product_id })));
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard");
+}
+
 export async function removeProductFromMenu(menuProductId: number) {
   const supabase = await createClient();
   const { error } = await supabase
@@ -69,6 +79,16 @@ export async function addComboToMenu(menuId: number, comboId: number) {
   const { error } = await supabase
     .from("menu_has_combo")
     .insert({ menu_id: menuId, combo_id: comboId });
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard");
+}
+
+export async function addCombosToMenu(menuId: number, comboIds: number[]) {
+  if (comboIds.length === 0) return { error: "Seleccioná al menos un combo" };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("menu_has_combo")
+    .insert(comboIds.map((combo_id) => ({ menu_id: menuId, combo_id })));
   if (error) return { error: error.message };
   revalidatePath("/dashboard");
 }

@@ -3,7 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { getRedirectByRole } from "@/lib/auth/get-redirect-by-role";
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url);
+  const requestUrl = new URL(request.url);
+  const searchParams = requestUrl.searchParams;
+  // Detrás de un reverse proxy, el origin de request.url puede resolver a la
+  // dirección interna donde escucha el proceso (ej. http://0.0.0.0:3000) en vez
+  // del dominio público — se usa NEXT_PUBLIC_SITE_URL como fuente de verdad.
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || requestUrl.origin;
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as "recovery" | "signup" | null;
   const code = searchParams.get("code");
