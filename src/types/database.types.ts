@@ -1358,6 +1358,7 @@ export type Database = {
           courtesy_by: string | null
           courtesy_reason: string | null
           created_at: string
+          customer_alias: string | null
           delivery_fee: number
           discount_total: number
           is_courtesy: boolean
@@ -1378,6 +1379,7 @@ export type Database = {
           courtesy_by?: string | null
           courtesy_reason?: string | null
           created_at?: string
+          customer_alias?: string | null
           delivery_fee?: number
           discount_total?: number
           is_courtesy?: boolean
@@ -1398,6 +1400,7 @@ export type Database = {
           courtesy_by?: string | null
           courtesy_reason?: string | null
           created_at?: string
+          customer_alias?: string | null
           delivery_fee?: number
           discount_total?: number
           is_courtesy?: boolean

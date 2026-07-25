@@ -1,14 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { hasDashboardAccess } from "@/lib/auth/get-redirect-by-role";
 import { LoginForm } from "./login-form";
-
-// admin/employ/socio entran al panel — el resto (o sin rol) va al menú del cliente.
-function hasDashboardAccess(roleNames: string[]): boolean {
-  return roleNames.some((r) => {
-    const code = r.toLowerCase().trim();
-    return code === "admin" || code === "employ" || code === "socio";
-  });
-}
 
 export default async function LoginPage({
   searchParams,

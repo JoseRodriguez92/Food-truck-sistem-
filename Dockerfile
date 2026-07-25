@@ -34,6 +34,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Alpine no trae la base de datos de timezones por default — sin tzdata,
+# TZ no tiene ningún efecto y el proceso queda en UTC igual.
+RUN apk add --no-cache tzdata
+ENV TZ=America/Bogota
+
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 

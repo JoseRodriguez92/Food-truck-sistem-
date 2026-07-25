@@ -15,5 +15,6 @@ services:
       - .env
     environment:
       - NODE_ENV=development
+      - TZ=America/Bogota
     command: npm run dev
     restart: unless-stopped

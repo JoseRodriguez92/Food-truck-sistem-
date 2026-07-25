@@ -18,6 +18,7 @@ import { PermisosView } from "@/components/admin/views/permisos-view";
 
 import { getTareas } from "@/lib/notion";
 import { TareasViews } from "@/app/admin/tareas/tareas-views";
+import { bogotaTodayStartISO, bogotaStartOfDayISO, bogotaEndOfDayISO } from "@/lib/utils/timezone";
 import { CheckpointButton } from "@/app/admin/tareas/checkpoint-button";
 import { SectionHeader } from "@/components/admin/section-header";
 import { getAccessibleLocations } from "@/app/dashboard/orders-actions";
@@ -47,8 +48,7 @@ export default async function DashboardPage({
   switch (section) {
     // ============ DASHBOARD (resumen de hoy) ============
     case "dashboard": {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
+      const todayStart = bogotaTodayStartISO();
 
       const { data: orders } = await supabase
         .from("profile_has_order")
@@ -65,7 +65,7 @@ export default async function DashboardPage({
           status_order(status_order_id, name, code, sort_order)
         `,
         )
-        .gte("created_at", todayStart.toISOString())
+        .gte("created_at", todayStart)
         .order("created_at", { ascending: false });
 
       const { data: allStatuses } = await supabase
@@ -108,7 +108,7 @@ export default async function DashboardPage({
         .from("profile_has_order")
         .select(
           `
-          profile_order_id, order_number, total, subtotal, discount_total, is_courtesy, courtesy_reason, created_at, notes, status_order_id, payment_method, location_id, stock_deducted,
+          profile_order_id, order_number, total, subtotal, discount_total, is_courtesy, courtesy_reason, created_at, notes, status_order_id, payment_method, location_id, stock_deducted, customer_alias,
           profiles!profile_has_order_profile_id_fkey(first_name, last_name, email),
           status_order(status_order_id, name, code, sort_order),
           location(location_id, name, food_truck(name)),
@@ -124,8 +124,8 @@ export default async function DashboardPage({
 
       if (statusFilter !== "all") query = query.eq("status_order_id", statusFilter);
       if (canApplyTruckFilter) query = query.in("location_id", truckLocationIds ?? []);
-      if (from) query = query.gte("created_at", new Date(`${from}T00:00:00`).toISOString());
-      if (to) query = query.lte("created_at", new Date(`${to}T23:59:59`).toISOString());
+      if (from) query = query.gte("created_at", bogotaStartOfDayISO(from));
+      if (to) query = query.lte("created_at", bogotaEndOfDayISO(to));
 
       if (q) {
         const orderNumberMatch = /^\d+$/.test(q) ? Number(q) : null;
@@ -138,6 +138,7 @@ export default async function DashboardPage({
         const orConditions: string[] = [];
         if (matchingIds.length > 0) orConditions.push(`profile_id.in.(${matchingIds.join(",")})`);
         if (orderNumberMatch !== null) orConditions.push(`order_number.eq.${orderNumberMatch}`);
+        orConditions.push(`customer_alias.ilike.%${q}%`);
 
         query =
           orConditions.length > 0
@@ -178,8 +179,8 @@ export default async function DashboardPage({
 
         if (statusFilter !== "all") legacyQuery.eq("status_order_id", statusFilter);
         if (canApplyTruckFilter) legacyQuery.in("location_id", truckLocationIds ?? []);
-        if (from) legacyQuery.gte("created_at", new Date(`${from}T00:00:00`).toISOString());
-        if (to) legacyQuery.lte("created_at", new Date(`${to}T23:59:59`).toISOString());
+        if (from) legacyQuery.gte("created_at", bogotaStartOfDayISO(from));
+        if (to) legacyQuery.lte("created_at", bogotaEndOfDayISO(to));
 
         if (q) {
           const orderNumberMatch = /^\d+$/.test(q) ? Number(q) : null;
@@ -532,8 +533,7 @@ export default async function DashboardPage({
 
     // ============ FALLBACK ============
     default: {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
+      const todayStart = bogotaTodayStartISO();
 
       const { data: orders } = await supabase
         .from("profile_has_order")
@@ -544,7 +544,7 @@ export default async function DashboardPage({
           status_order(status_order_id, name, code, sort_order)
         `,
         )
-        .gte("created_at", todayStart.toISOString())
+        .gte("created_at", todayStart)
         .order("created_at", { ascending: false });
 
       const { data: allStatuses } = await supabase

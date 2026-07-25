@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import { bogotaStartOfDayISO, bogotaEndOfDayISO } from "@/lib/utils/timezone";
 
 // ─── Buscar clientes (para el picker del pedido manual) ───────────────────────
 
@@ -156,6 +157,7 @@ const createManualOrderSchema = z.object({
   notes: z.string().optional(),
   isCourtesy: z.boolean().optional(),
   courtesyReason: z.string().optional(),
+  customerAlias: z.string().optional(),
   items: z.array(itemSchema).min(1, "Agregá al menos un producto"),
 });
 
@@ -165,6 +167,7 @@ export async function createManualOrder(input: {
   notes?: string;
   isCourtesy?: boolean;
   courtesyReason?: string;
+  customerAlias?: string;
   items: { type: "product" | "combo"; itemId: number; name: string; price: number; quantity: number }[];
 }) {
   const parsed = createManualOrderSchema.safeParse(input);
@@ -209,6 +212,8 @@ export async function createManualOrder(input: {
       courtesy_reason: isCourtesy ? courtesyReason : null,
       courtesy_by: isCourtesy ? user.id : null,
       notes: parsed.data.notes?.trim() || null,
+      // Solo tiene sentido para pedidos mostrador — si hay cliente registrado, se ignora.
+      customer_alias: !parsed.data.profileId ? (parsed.data.customerAlias?.trim() || null) : null,
     })
     .select("profile_order_id, order_number")
     .single();
@@ -243,6 +248,7 @@ const updateManualOrderSchema = z.object({
   notes: z.string().optional(),
   isCourtesy: z.boolean().optional(),
   courtesyReason: z.string().optional(),
+  customerAlias: z.string().optional(),
   items: z.array(itemSchema).min(1, "Agregá al menos un producto"),
 });
 
@@ -251,6 +257,7 @@ export async function updateManualOrder(input: {
   notes?: string;
   isCourtesy?: boolean;
   courtesyReason?: string;
+  customerAlias?: string;
   items: { type: "product" | "combo"; itemId: number; name: string; price: number; quantity: number }[];
 }) {
   const parsed = updateManualOrderSchema.safeParse(input);
@@ -270,7 +277,7 @@ export async function updateManualOrder(input: {
 
   const { data: order, error: orderErr } = await supabase
     .from("profile_has_order")
-    .select("profile_order_id, order_number")
+    .select("profile_order_id, order_number, profile_id")
     .eq("profile_order_id", parsed.data.profileOrderId)
     .single();
   if (orderErr || !order) return { error: "Pedido no encontrado" };
@@ -305,6 +312,8 @@ export async function updateManualOrder(input: {
       courtesy_reason: isCourtesy ? courtesyReason : null,
       courtesy_by: isCourtesy ? user.id : null,
       notes: parsed.data.notes?.trim() || null,
+      // Solo aplica a pedidos mostrador (sin cliente registrado).
+      ...(order.profile_id ? {} : { customer_alias: parsed.data.customerAlias?.trim() || null }),
     })
     .eq("profile_order_id", parsed.data.profileOrderId);
   if (updateErr) return { error: updateErr.message };
@@ -388,8 +397,8 @@ export async function getOrdersReport(
 
   if (filters.status !== "all") query = query.eq("status_order_id", filters.status);
   if (truckLocationIds) query = query.in("location_id", truckLocationIds);
-  if (filters.from) query = query.gte("created_at", new Date(`${filters.from}T00:00:00`).toISOString());
-  if (filters.to) query = query.lte("created_at", new Date(`${filters.to}T23:59:59`).toISOString());
+  if (filters.from) query = query.gte("created_at", bogotaStartOfDayISO(filters.from));
+  if (filters.to) query = query.lte("created_at", bogotaEndOfDayISO(filters.to));
 
   if (filters.q) {
     const q = filters.q.trim().replace(/[,()]/g, " ").trim();

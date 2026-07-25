@@ -4,7 +4,7 @@ import { useState, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Menu, X, LogIn, ClipboardList, Instagram, UtensilsCrossed } from "lucide-react";
+import { Menu, X, LogIn, ClipboardList, Instagram, UtensilsCrossed, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
@@ -19,7 +19,7 @@ interface Profile {
   avatar_url?: string | null;
 }
 
-function SidebarInner({ profile }: { profile: Profile | null }) {
+function SidebarInner({ profile, canAccessDashboard }: { profile: Profile | null; canAccessDashboard: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
@@ -54,6 +54,17 @@ function SidebarInner({ profile }: { profile: Profile | null }) {
           >
             <ClipboardList className="w-4 h-4 shrink-0" />
             Mis pedidos
+          </Link>
+        )}
+
+        {canAccessDashboard && (
+          <Link
+            href="/dashboard"
+            onClick={onNavigate}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium border border-primary/30 text-primary hover:bg-primary/10 transition-colors"
+          >
+            <LayoutDashboard className="w-4 h-4 shrink-0" />
+            Ir al panel
           </Link>
         )}
       </nav>
@@ -203,10 +214,16 @@ function SidebarInner({ profile }: { profile: Profile | null }) {
   );
 }
 
-export function ClientSidebar({ profile }: { profile: Profile | null }) {
+export function ClientSidebar({
+  profile,
+  canAccessDashboard = false,
+}: {
+  profile: Profile | null;
+  canAccessDashboard?: boolean;
+}) {
   return (
     <Suspense fallback={null}>
-      <SidebarInner profile={profile} />
+      <SidebarInner profile={profile} canAccessDashboard={canAccessDashboard} />
     </Suspense>
   );
 }

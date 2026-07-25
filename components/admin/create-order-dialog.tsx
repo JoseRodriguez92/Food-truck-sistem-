@@ -74,6 +74,7 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
   const [customerResults, setCustomerResults] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [searchingCustomer, setSearchingCustomer] = useState(false);
+  const [customerAlias, setCustomerAlias] = useState("");
 
   // Catálogo
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
@@ -148,6 +149,7 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
     setCustomerQuery("");
     setCustomerResults([]);
     setSelectedCustomer(null);
+    setCustomerAlias("");
     setCatalogQuery("");
     setCart([]);
     setNotes("");
@@ -201,6 +203,7 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
         notes,
         isCourtesy,
         courtesyReason,
+        customerAlias: customerMode === "walkin" ? customerAlias : undefined,
         items: cart.map((l) => ({ type: l.type, itemId: l.id, name: l.name, price: effectivePrice(l, isPartnerPrice), quantity: l.quantity })),
       });
       if ("error" in result) {
@@ -271,6 +274,20 @@ export function CreateOrderDialog({ open, onOpenChange }: { open: boolean; onOpe
                 <User className="w-3.5 h-3.5" /> Cliente registrado
               </Button>
             </div>
+
+            {customerMode === "walkin" && (
+              <div className="space-y-1.5">
+                <Input
+                  placeholder="Ej: Alee, Mesa 3..."
+                  value={customerAlias}
+                  onChange={(e) => setCustomerAlias(e.target.value)}
+                  maxLength={40}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Opcional — un nombre o referencia para saber a quién entregarle el pedido.
+                </p>
+              </div>
+            )}
 
             {customerMode === "search" && (
               <div className="space-y-2">

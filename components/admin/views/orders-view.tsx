@@ -75,6 +75,7 @@ export type OrderRow = {
   is_courtesy: boolean;
   courtesy_reason: string | null;
   stock_deducted: boolean;
+  customer_alias: string | null;
   created_at: string;
   notes: string | null;
   status_order_id: string | null;
@@ -206,6 +207,7 @@ export function OrdersView({
   const [editNotes, setEditNotes] = useState("");
   const [editIsCourtesy, setEditIsCourtesy] = useState(false);
   const [editCourtesyReason, setEditCourtesyReason] = useState("");
+  const [editCustomerAlias, setEditCustomerAlias] = useState("");
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [catalogQuery, setCatalogQuery] = useState("");
   const [catalogLoading, setCatalogLoading] = useState(false);
@@ -264,6 +266,7 @@ export function OrdersView({
     setEditLines([]);
     setEditIsCourtesy(false);
     setEditCourtesyReason("");
+    setEditCustomerAlias("");
     setCatalogQuery("");
     setCatalog([]);
   }
@@ -275,6 +278,7 @@ export function OrdersView({
     setEditNotes("");
     setEditIsCourtesy(false);
     setEditCourtesyReason("");
+    setEditCustomerAlias("");
     setCatalogQuery("");
     setCatalog([]);
   }
@@ -285,6 +289,7 @@ export function OrdersView({
     setEditNotes(detailOrder.notes ?? "");
     setEditIsCourtesy(!!detailOrder.is_courtesy);
     setEditCourtesyReason(detailOrder.courtesy_reason ?? "");
+    setEditCustomerAlias(detailOrder.customer_alias ?? "");
     setCatalogQuery("");
     setIsEditing(true);
   }
@@ -329,6 +334,7 @@ export function OrdersView({
         notes: editNotes,
         isCourtesy: editIsCourtesy,
         courtesyReason: editCourtesyReason,
+        customerAlias: editCustomerAlias,
         items: editLines.map((line) => ({
           type: line.type,
           itemId: line.id,
@@ -547,6 +553,13 @@ export function OrdersView({
                               <p className="text-xs text-muted-foreground hidden sm:block">{profile.email}</p>
                             )}
                           </>
+                        ) : order.customer_alias ? (
+                          <>
+                            <p className="text-sm font-medium">{order.customer_alias}</p>
+                            <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                              <Store className="w-2.5 h-2.5" /> Mostrador
+                            </span>
+                          </>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">
                             <Store className="w-3 h-3" /> Mostrador
@@ -669,6 +682,14 @@ export function OrdersView({
                 </span>
               </div>
 
+              {!one(detailOrder.profiles) && detailOrder.customer_alias && !isEditing && (
+                <div className="flex items-center gap-1.5 text-sm">
+                  <Store className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="font-medium">{detailOrder.customer_alias}</span>
+                  <span className="text-xs text-muted-foreground">(Mostrador)</span>
+                </div>
+              )}
+
               {!isEditing ? (
                 <>
                   <div className="rounded-lg border border-border divide-y divide-border">
@@ -737,6 +758,20 @@ export function OrdersView({
                 </>
               ) : (
                 <>
+                  {!one(detailOrder.profiles) && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Nombre / referencia (mostrador)
+                      </p>
+                      <Input
+                        value={editCustomerAlias}
+                        onChange={(e) => setEditCustomerAlias(e.target.value)}
+                        placeholder="Ej: Alee, Mesa 3..."
+                        maxLength={40}
+                      />
+                    </div>
+                  )}
+
                   <div className="grid gap-3">
                     <div className="relative">
                       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />

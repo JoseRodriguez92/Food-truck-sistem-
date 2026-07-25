@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getRedirectByRole } from "@/lib/auth/get-redirect-by-role";
+import { hasDashboardAccess } from "@/lib/auth/get-redirect-by-role";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -50,21 +50,23 @@ export async function GET(request: NextRequest) {
       }
 
       // Si venía de un flujo con retorno explícito (ej. guest checkout), respetarlo.
-      // Si no, decidir destino según el rol real del usuario (admin/employ → /dashboard).
+      // Si no, decidir destino según los roles reales del usuario (admin/employ/socio → /dashboard).
       if (explicitNext && explicitNext.startsWith("/")) {
         return NextResponse.redirect(`${origin}${explicitNext}`);
       }
 
-      const { data: roleData } = await supabase
+      // Un usuario puede tener varios roles — alcanza con que uno dé acceso al panel.
+      const { data: roleRows } = await supabase
         .from("profile_has_role")
         .select("roles(name)")
-        .eq("profile_id", data.user.id)
-        .limit(1)
-        .single();
-      const rolesRaw = roleData?.roles as unknown as { name: string } | { name: string }[] | null;
-      const roleName = (Array.isArray(rolesRaw) ? rolesRaw[0] : rolesRaw)?.name ?? "client";
+        .eq("profile_id", data.user.id);
+      const roleNames = (roleRows ?? []).map((r) => {
+        const roles = r.roles as unknown as { name: string } | { name: string }[] | null;
+        const role = Array.isArray(roles) ? roles[0] : roles;
+        return role?.name ?? "";
+      });
 
-      return NextResponse.redirect(`${origin}${getRedirectByRole(roleName)}`);
+      return NextResponse.redirect(`${origin}${hasDashboardAccess(roleNames) ? "/dashboard" : "/client"}`);
     }
   }
 

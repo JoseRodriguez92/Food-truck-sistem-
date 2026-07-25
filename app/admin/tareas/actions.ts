@@ -4,6 +4,7 @@ import { Client } from "@notionhq/client";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/app/actions/send-email";
 import { getTareas } from "@/lib/notion";
+import { bogotaTodayDateString } from "@/lib/utils/timezone";
 
 // Mapa de emails por usuario — completar con los correos reales
 const USUARIO_EMAIL: Record<string, string> = {
@@ -68,7 +69,7 @@ export type CheckpointReminderResult = {
 };
 
 export async function sendCheckpointReminders(): Promise<CheckpointReminderResult> {
-  const today = new Date().toISOString().split("T")[0]; // "YYYY-MM-DD"
+  const today = bogotaTodayDateString(); // "YYYY-MM-DD" en hora Bogotá, no UTC del server
   const tareas = await getTareas();
 
   let sent = 0;
