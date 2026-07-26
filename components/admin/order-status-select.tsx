@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { updateOrderStatus } from "@/app/admin/actions";
 import { toast } from "sonner";
@@ -46,6 +47,11 @@ export function OrderStatusSelect({
   const current = statuses.find((s) => s.status_order_id === currentStatusId);
   const style = getOrderStatusStyle(current?.code ?? "");
 
+  // Un pedido cancelado es terminal: ya se devolvió el stock y se borró su
+  // conteo de producción. Reactivarlo volvería a descontar todo de nuevo, así
+  // que el estado queda bloqueado.
+  const isCancelled = current?.code === "cancelled";
+
   function commit(statusOrderId: string, paymentMethod?: string) {
     startTransition(async () => {
       const result = await updateOrderStatus(profileOrderId, statusOrderId, paymentMethod);
@@ -66,6 +72,22 @@ export function OrderStatusSelect({
       return;
     }
     commit(statusOrderId);
+  }
+
+  // Cancelado: badge fijo, sin desplegable
+  if (isCancelled) {
+    return (
+      <span
+        title="Un pedido cancelado no se puede reactivar"
+        className={cn(
+          "inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium",
+          style.badge,
+        )}
+      >
+        <Lock className="size-3" />
+        {current?.name ?? "Cancelada"}
+      </span>
+    );
   }
 
   return (

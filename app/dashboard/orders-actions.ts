@@ -4,6 +4,15 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 import { bogotaStartOfDayISO, bogotaEndOfDayISO } from "@/lib/utils/timezone";
+// Los tipos del Pedido Rápido viven en `lib/quick-order-parser` y se importan
+// desde ahí, NO se re-exportan acá: en un archivo "use server" todo export se
+// trata como server action en runtime, y `export type { ... }` rompe el build
+// ("Export QuickOrderCandidate doesn't exist in target module").
+import {
+  parseQuickOrder,
+  type QuickOrderEntry,
+  type QuickOrderParseResult,
+} from "@/lib/quick-order-parser";
 
 // ─── Buscar clientes (para el picker del pedido manual) ───────────────────────
 
@@ -321,6 +330,101 @@ export async function updateManualOrder(input: {
   revalidatePath("/dashboard");
   return { success: true, orderNumber: order.order_number };
 }
+
+// ─── PEDIDO RÁPIDO: texto libre → pedido ──────────────────────────────────────
+// El staff escribe "2 parcerita, coca, para Mariana" y esto lo interpreta.
+// La lógica de parsing vive en `lib/quick-order-parser.ts` (pura y testeable);
+// acá solo se arma el catálogo de la ubicación y se delega.
+//
+// Nunca crea nada: devuelve un preview que el diálogo muestra para confirmar.
+
+
+/** Catálogo de la ubicación, incluyendo search_aliases (si la migración corrió). */
+async function getQuickOrderEntries(locationId: number): Promise<QuickOrderEntry[]> {
+  const supabase = await createClient();
+
+  const { data: locationMenus } = await supabase
+    .from("location_has_menu")
+    .select("menu_id")
+    .eq("location_id", locationId);
+  const menuIds = (locationMenus ?? []).map((lm) => lm.menu_id);
+  if (menuIds.length === 0) return [];
+
+  type ProductRow = { product_id: number; name: string; price: number; search_aliases?: string[] | null };
+  type ComboRow = { combo_id: number; name: string; price: number; active: boolean; search_aliases?: string[] | null };
+
+  // Si `add_product_search_aliases.sql` todavía no se aplicó, la columna no
+  // existe y la query falla. En ese caso se cae al catálogo sin alias en vez de
+  // romper el diálogo entero: el Pedido Rápido sigue andando por nombre real.
+  let productRows: { product: ProductRow | ProductRow[] | null }[] = [];
+  let comboRows: { combo: ComboRow | ComboRow[] | null }[] = [];
+  let withAliases = true;
+
+  const [aliasProducts, aliasCombos] = await Promise.all([
+    supabase
+      .from("menu_has_product")
+      .select("product(product_id, name, price, search_aliases)")
+      .in("menu_id", menuIds),
+    supabase
+      .from("menu_has_combo")
+      .select("combo(combo_id, name, price, active, search_aliases)")
+      .in("menu_id", menuIds),
+  ]);
+
+  if (aliasProducts.error || aliasCombos.error) {
+    withAliases = false;
+    const [plainProducts, plainCombos] = await Promise.all([
+      supabase.from("menu_has_product").select("product(product_id, name, price)").in("menu_id", menuIds),
+      supabase.from("menu_has_combo").select("combo(combo_id, name, price, active)").in("menu_id", menuIds),
+    ]);
+    productRows = (plainProducts.data ?? []) as never;
+    comboRows = (plainCombos.data ?? []) as never;
+  } else {
+    productRows = (aliasProducts.data ?? []) as never;
+    comboRows = (aliasCombos.data ?? []) as never;
+  }
+
+  const entries: QuickOrderEntry[] = [];
+  const seen = new Set<string>();
+
+  for (const row of productRows) {
+    const p = toSingleRel<ProductRow>(row.product);
+    if (!p) continue;
+    const key = `product-${p.product_id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    entries.push({
+      candidate: { id: p.product_id, name: p.name, price: p.price, type: "product" },
+      labels: [p.name, ...(withAliases ? (p.search_aliases ?? []) : [])],
+    });
+  }
+
+  for (const row of comboRows) {
+    const c = toSingleRel<ComboRow>(row.combo);
+    if (!c || !c.active) continue;
+    const key = `combo-${c.combo_id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    entries.push({
+      candidate: { id: c.combo_id, name: c.name, price: c.price, type: "combo" },
+      labels: [c.name, ...(withAliases ? (c.search_aliases ?? []) : [])],
+    });
+  }
+
+  entries.sort((a, b) => a.candidate.name.localeCompare(b.candidate.name));
+  return entries;
+}
+
+export async function parseQuickOrderText(
+  text: string,
+  locationId: number,
+): Promise<QuickOrderParseResult> {
+  const entries = await getQuickOrderEntries(locationId);
+  const { groups } = parseQuickOrder(text, entries);
+
+  return { groups, catalog: entries.map((e) => e.candidate) };
+}
+
 
 // ─── Reporte de ventas (según filtros activos en Pedidos) ─────────────────────
 // Arma el ranking de productos/combos vendidos (excluye cancelados), detecta si

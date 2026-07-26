@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, ShoppingBag, Package, Layers, Plus, Minus, MapPin, Pencil, Loader2, Trash2, Store, CalendarDays, Wallet, BarChart3 } from "lucide-react";
+import { Search, X, ShoppingBag, Package, Layers, Plus, Minus, MapPin, Pencil, Loader2, Trash2, Store, Wallet, BarChart3, CalendarDays, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -29,6 +28,9 @@ import { OrderStatusSelect } from "@/components/admin/order-status-select";
 import { SectionHeader } from "@/components/admin/section-header";
 import { CreateOrderDialog } from "@/components/admin/create-order-dialog";
 import { OrdersReportDialog } from "@/components/admin/orders-report-dialog";
+import { OrdersFiltersBody, OrdersFiltersSheet } from "@/components/admin/orders-filters";
+import { OrderCards } from "@/components/admin/order-cards";
+import { QuickOrderDialog } from "@/components/admin/quick-order-dialog";
 import { getCatalogForOrder, updateManualOrder, deleteOrder } from "@/app/dashboard/orders-actions";
 import { useSelectedTruckStore } from "@/lib/store/selected-truck";
 import { paymentMethodLabel } from "@/lib/payment-method";
@@ -168,6 +170,7 @@ export function OrdersView({
   orders,
   allStatuses,
   filters,
+  isDefaultRange = false,
   page,
   totalPages,
   totalCount,
@@ -176,6 +179,8 @@ export function OrdersView({
   orders: OrderRow[];
   allStatuses: OrderStatus[];
   filters: OrdersFilters;
+  /** true cuando el rango de fechas viene del default "hoy" y no de una elección del usuario. */
+  isDefaultRange?: boolean;
   page: number;
   totalPages: number;
   totalCount: number;
@@ -201,7 +206,10 @@ export function OrdersView({
   }, [selectedTruck]);
   const [detailOrder, setDetailOrder] = useState<OrderRow | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  // En mobile los filtros viven en un bottom sheet (trigger al lado de la campanita)
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editLines, setEditLines] = useState<EditableLine[]>([]);
   const [editNotes, setEditNotes] = useState("");
@@ -356,23 +364,63 @@ export function OrdersView({
     });
   }
 
+  // El rango "hoy" por default NO cuenta como filtro del usuario: si no,
+  // la vista arrancaría siempre marcada como "(filtrado)" con 2 filtros activos.
+  const hasDateFilter = !isDefaultRange && !!(filters.from || filters.to);
   const hasActiveFilters = !!(
     filters.q ||
     (filters.status && filters.status !== "all") ||
-    filters.from ||
-    filters.to
+    hasDateFilter
   );
 
+  // Cantidad de filtros aplicados — se muestra como badge sobre el botón mobile
+  const activeFiltersCount =
+    (filters.q ? 1 : 0) +
+    (filters.status && filters.status !== "all" ? 1 : 0) +
+    (!isDefaultRange && filters.from ? 1 : 0) +
+    (!isDefaultRange && filters.to ? 1 : 0);
+
+  // Etiqueta del alcance actual, para el subtítulo del header
+  const scopeLabel = isDefaultRange
+    ? "de hoy"
+    : hasActiveFilters
+      ? "(filtrado)"
+      : "en total";
+
+  const emptyLabel = isDefaultRange
+    ? "Todavía no hay pedidos hoy"
+    : hasActiveFilters
+      ? "Sin resultados para estos filtros"
+      : "Sin pedidos registrados";
+
   function navigate(
-    overrides: Partial<{ status: string; q: string; from: string; to: string; page: number }> = {},
+    overrides: Partial<{
+      status: string;
+      q: string;
+      from: string;
+      to: string;
+      range: string;
+      page: number;
+    }> = {},
   ) {
-    const next = { status, q, from, to, page: 1, ...overrides };
+    const next = { status, q, from, to, page: 1, range: "", ...overrides };
     const params = new URLSearchParams({ section: "orders" });
     if (selectedTruck) params.set("truck", String(selectedTruck));
     if (next.status && next.status !== "all") params.set("status", next.status);
     if (next.q) params.set("q", next.q);
-    if (next.from) params.set("from", next.from);
-    if (next.to) params.set("to", next.to);
+
+    // Si el rango sigue siendo el default de "hoy", no lo escribimos en la URL:
+    // así cambiar el estado o buscar no "congela" la fecha y el default sigue
+    // vigente mañana (si no, quedaría pegado el día en que se hizo clic).
+    const stillDefaultRange =
+      isDefaultRange && next.from === filters.from && next.to === filters.to;
+
+    if (!stillDefaultRange) {
+      if (next.from) params.set("from", next.from);
+      if (next.to) params.set("to", next.to);
+      if (next.range) params.set("range", next.range);
+    }
+
     if (next.page && next.page > 1) params.set("page", String(next.page));
     router.push(`/dashboard?${params.toString()}`);
   }
@@ -387,8 +435,16 @@ export function OrdersView({
     router.push(`/dashboard?${params.toString()}`);
   }
 
-  function applyQuickRange(range: "today" | "last7" | "month") {
+  function applyQuickRange(range: "today" | "last7" | "month" | "all") {
     const today = new Date();
+
+    // "Todo" desactiva el default de hoy y muestra el historial completo
+    if (range === "all") {
+      setFrom("");
+      setTo("");
+      navigate({ from: "", to: "", range: "all" });
+      return;
+    }
 
     if (range === "today") {
       const date = toDateInputValue(today);
@@ -417,11 +473,49 @@ export function OrdersView({
     navigate({ from: fromDate, to: toDate });
   }
 
+  // Props compartidas entre el panel inline (desktop) y el sheet (mobile).
+  // Las acciones que disparan navegación cierran el sheet para que el usuario
+  // vea el resultado sin tener que cerrarlo a mano.
+  const filterProps = {
+    q,
+    onQChange: setQ,
+    status,
+    onStatusChange: (v: string) => {
+      setStatus(v);
+      navigate({ status: v });
+    },
+    from,
+    onFromChange: (v: string) => {
+      setFrom(v);
+      navigate({ from: v });
+    },
+    to,
+    onToChange: (v: string) => {
+      setTo(v);
+      navigate({ to: v });
+    },
+    statuses: allStatuses,
+    hasActiveFilters,
+    onSearch: () => {
+      navigate({ q });
+      setFiltersOpen(false);
+    },
+    onClear: () => {
+      clearFilters();
+      setFiltersOpen(false);
+    },
+    onQuickRange: (range: "today" | "last7" | "month" | "all") => {
+      applyQuickRange(range);
+      setFiltersOpen(false);
+    },
+    isDefaultRange,
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       <SectionHeader
         title="Pedidos"
-        subtitle={`${totalCount} pedido${totalCount !== 1 ? "s" : ""} ${hasActiveFilters ? "(filtrado)" : "en total"}`}
+        subtitle={`${totalCount} pedido${totalCount !== 1 ? "s" : ""} ${scopeLabel}`}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => setReportOpen(true)} className="gap-2">
@@ -430,81 +524,66 @@ export function OrdersView({
             <Button onClick={() => setCreateOpen(true)} className="gap-2">
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nuevo pedido</span>
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="shrink-0"
+              onClick={() => setQuickOpen(true)}
+              aria-label="Pedido rápido"
+            >
+              <Sparkles className="w-4 h-4" />
+            </Button>
+            <OrdersFiltersSheet
+              open={filtersOpen}
+              onOpenChange={setFiltersOpen}
+              activeCount={activeFiltersCount}
+              {...filterProps}
+            />
           </div>
         }
       />
 
-      {/* Filtros */}
-      <div className="rounded-xl border border-border p-4 space-y-3">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Cliente o # pedido..."
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && navigate({ q })}
-              className="pl-8"
-            />
-          </div>
+      {/* Filtros — inline solo desde lg; abajo de eso van en el sheet del header */}
+      <div className="hidden lg:block rounded-xl border border-border p-4">
+        <OrdersFiltersBody {...filterProps} />
+      </div>
 
-          <Select value={status} onValueChange={(v) => { setStatus(v); navigate({ status: v }); }}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              {allStatuses.map((s) => (
-                <SelectItem key={s.status_order_id} value={s.status_order_id}>
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Input
-            type="date"
-            value={from}
-            onChange={(e) => { setFrom(e.target.value); navigate({ from: e.target.value }); }}
-            placeholder="Desde"
-          />
-
-          <Input
-            type="date"
-            value={to}
-            onChange={(e) => { setTo(e.target.value); navigate({ to: e.target.value }); }}
-            placeholder="Hasta"
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 justify-between">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button size="sm" onClick={() => navigate({ q })} className="gap-1.5">
-              <Search className="w-3.5 h-3.5" /> Buscar
-            </Button>
-            {hasActiveFilters && (
-              <Button size="sm" variant="ghost" onClick={clearFilters} className="gap-1.5 text-muted-foreground">
+      {/* Alcance actual / filtros activos — mobile */}
+      {(hasActiveFilters || isDefaultRange) && (
+        <div className="lg:hidden flex items-center justify-between gap-2 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2">
+          {isDefaultRange ? (
+            <>
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <CalendarDays className="w-3.5 h-3.5 text-primary" /> Mostrando pedidos de hoy
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => applyQuickRange("all")}
+                className="h-7 text-muted-foreground"
+              >
+                Ver todo
+              </Button>
+            </>
+          ) : (
+            <>
+              <span className="text-xs text-muted-foreground">
+                {activeFiltersCount} filtro{activeFiltersCount !== 1 ? "s" : ""} activo
+                {activeFiltersCount !== 1 ? "s" : ""}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={clearFilters}
+                className="h-7 gap-1.5 text-muted-foreground"
+              >
                 <X className="w-3.5 h-3.5" /> Limpiar
               </Button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
-              <CalendarDays className="w-3.5 h-3.5" /> Rango rápido:
-            </span>
-            <Button type="button" size="sm" variant="outline" onClick={() => applyQuickRange("today")}>
-              Hoy
-            </Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => applyQuickRange("last7")}>
-              7 días
-            </Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => applyQuickRange("month")}>
-              Este mes
-            </Button>
-          </div>
+            </>
+          )}
         </div>
-      </div>
+      )}
 
       {loadError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -512,12 +591,24 @@ export function OrdersView({
         </div>
       )}
 
-      {/* Tabla */}
-      <div className="rounded-xl border border-border overflow-hidden">
+      {/* Cards con swipe — mobile */}
+      <div className="md:hidden">
+        <OrderCards
+          orders={orders}
+          allStatuses={allStatuses}
+          onView={openDetail}
+          onDelete={handleDelete}
+          deletingId={deletingId}
+          emptyLabel={emptyLabel}
+        />
+      </div>
+
+      {/* Tabla — md+ */}
+      <div className="hidden md:block rounded-xl border border-border overflow-hidden">
         {orders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <ShoppingBag className="w-10 h-10 mb-3 opacity-30" />
-            <p className="text-sm">{hasActiveFilters ? "Sin resultados para estos filtros" : "Sin pedidos registrados"}</p>
+            <p className="text-sm">{emptyLabel}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -926,6 +1017,8 @@ export function OrdersView({
       </Sheet>
 
       <CreateOrderDialog open={createOpen} onOpenChange={setCreateOpen} />
+
+      <QuickOrderDialog open={quickOpen} onOpenChange={setQuickOpen} />
 
       <OrdersReportDialog
         open={reportOpen}

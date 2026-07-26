@@ -12,6 +12,9 @@ import {
   Search,
   X,
   Factory,
+  Square,
+  Loader2,
+  History,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -46,9 +49,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 
-import { createBatch, updateBatch, deleteBatch } from "@/app/admin/lotes/actions";
+import { createBatch, updateBatch, deleteBatch, closeProductionRun } from "@/app/admin/lotes/actions";
 import { BatchRecipeDialog } from "@/components/admin/batch-recipe-dialog";
 import { BatchProduceDrawer } from "@/components/admin/batch-produce-drawer";
+import { BatchRunsDrawer } from "@/components/admin/batch-runs-drawer";
 import { SectionHeader } from "@/components/admin/section-header";
 import { useSelectedTruckStore } from "@/lib/store/selected-truck";
 
@@ -75,11 +79,44 @@ export type AllIngredient = {
 
 export type FoodTruck = { food_truck_id: number; name: string };
 
+/** Venta registrada sin tanda abierta — espera a la próxima producción. */
+export type PendingOutput = {
+  production_batch_id: number;
+  food_truck_id: number;
+  quantity: number;
+  created_at: string;
+  product: { name: string } | null;
+};
+
+/** Fila de `v_production_run_summary` — una tanda producida. */
+export type ProductionRun = {
+  production_run_id: number;
+  production_batch_id: number;
+  batch_name: string;
+  food_truck_id: number;
+  truck_name: string | null;
+  opened_at: string;
+  closed_at: string | null;
+  is_open: boolean;
+  units_sold: number;
+  orders_count: number;
+};
+
 const schema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
   description: z.string().optional(),
 });
 type FormValues = z.infer<typeof schema>;
+
+/** Fecha de hoy en Bogotá como "26/07/2026" — para prefijar el nombre del lote. */
+function todayLabel(): string {
+  return new Date().toLocaleDateString("es-CO", {
+    timeZone: "America/Bogota",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
 
 function BatchForm({ defaultValues }: { defaultValues?: Partial<FormValues> }) {
   const {
@@ -96,7 +133,7 @@ function BatchForm({ defaultValues }: { defaultValues?: Partial<FormValues> }) {
         <Label htmlFor="batch-name">Nombre</Label>
         <Input
           id="batch-name"
-          placeholder="Ej. Preparación de la mañana"
+          placeholder="Ej. Lote de pollo"
           aria-invalid={!!errors.name}
           {...register("name")}
         />
@@ -116,9 +153,13 @@ function BatchForm({ defaultValues }: { defaultValues?: Partial<FormValues> }) {
 export function BatchesView({
   batches,
   allIngredients,
+  runs = [],
+  pendingOutputs = [],
 }: {
   batches: Batch[];
   allIngredients: AllIngredient[];
+  runs?: ProductionRun[];
+  pendingOutputs?: PendingOutput[];
 }) {
   const selectedTruck = useSelectedTruckStore((s) => s.selectedTruck);
   const [isPending, startTransition] = useTransition();
@@ -128,6 +169,31 @@ export function BatchesView({
   const [recipeItem, setRecipeItem] = useState<Batch | null>(null);
   const [produceItem, setProduceItem] = useState<Batch | null>(null);
   const [search, setSearch] = useState("");
+  const [closingRun, setClosingRun] = useState<number | null>(null);
+  const [runsItem, setRunsItem] = useState<Batch | null>(null);
+
+  // Corrida abierta por lote, para el truck que está activo en el sidebar.
+  // Solo puede haber una por lote+truck (índice único parcial en la DB).
+  const openRunByBatch = new Map<number, ProductionRun>();
+  for (const run of runs) {
+    if (!run.is_open) continue;
+    if (selectedTruck != null && run.food_truck_id !== selectedTruck) continue;
+    openRunByBatch.set(run.production_batch_id, run);
+  }
+
+  function handleCloseRun(run: ProductionRun) {
+    setClosingRun(run.production_run_id);
+    startTransition(async () => {
+      const result = await closeProductionRun(run.production_run_id);
+      setClosingRun(null);
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
+      const vendidas = (result?.data as { total_vendido?: number } | null)?.total_vendido ?? 0;
+      toast.success(`Producción cerrada — ${vendidas} unidad${vendidas !== 1 ? "es" : ""} vendida${vendidas !== 1 ? "s" : ""}`);
+    });
+  }
 
   // Recargar el batch abierto en los diálogos con datos frescos tras editar ingredientes
   const liveRecipeItem = recipeItem
@@ -293,19 +359,60 @@ export function BatchesView({
                     </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-56 truncate">
-                    {b.description ?? "—"}
+                    {(() => {
+                      const run = openRunByBatch.get(b.production_batch_id);
+                      if (!run) return b.description ?? "—";
+                      return (
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-500">
+                            <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            En producción
+                          </span>
+                          <span className="text-xs text-foreground">
+                            {run.units_sold} vendida{run.units_sold !== 1 ? "s" : ""}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      {openRunByBatch.has(b.production_batch_id) ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5 text-xs"
+                          title="Cerrar la producción abierta"
+                          disabled={isPending}
+                          onClick={() => handleCloseRun(openRunByBatch.get(b.production_batch_id)!)}
+                        >
+                          {closingRun === openRunByBatch.get(b.production_batch_id)!.production_run_id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Square className="w-3.5 h-3.5" />
+                          )}
+                          Cerrar
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 hover:text-emerald-400"
+                          title="Producir — descuenta ingredientes y abre la producción"
+                          disabled={b.items.length === 0}
+                          onClick={() => setProduceItem(b)}
+                        >
+                          <Factory className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 hover:text-emerald-400"
-                        title="Producir"
-                        disabled={b.items.length === 0}
-                        onClick={() => setProduceItem(b)}
+                        className="h-8 w-8"
+                        title="Producciones y ventas"
+                        onClick={() => setRunsItem(b)}
                       >
-                        <Factory className="w-3.5 h-3.5" />
+                        <History className="w-3.5 h-3.5" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -338,7 +445,9 @@ export function BatchesView({
           <DialogHeader>
             <DialogTitle>Nuevo lote</DialogTitle>
           </DialogHeader>
-          <BatchForm />
+          {/* El nombre viene prefijado con la fecha de creación; el staff
+              completa qué lote es ("Lote de pollo") a continuación. */}
+          <BatchForm defaultValues={{ name: `${todayLabel()} — ` }} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
               Cancelar
@@ -381,6 +490,14 @@ export function BatchesView({
         allIngredients={allIngredients}
         open={!!recipeItem}
         onOpenChange={(o) => !o && setRecipeItem(null)}
+      />
+
+      <BatchRunsDrawer
+        batch={runsItem}
+        runs={runs}
+        pendingOutputs={pendingOutputs}
+        open={!!runsItem}
+        onOpenChange={(o) => !o && setRunsItem(null)}
       />
 
       {/* Drawer Producir */}

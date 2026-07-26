@@ -1070,6 +1070,7 @@ export type Database = {
           partner_price: number | null
           price: number
           product_id: number
+          production_batch_id: number | null
         }
         Insert: {
           category_id?: number | null
@@ -1078,6 +1079,7 @@ export type Database = {
           partner_price?: number | null
           price?: number
           product_id?: never
+          production_batch_id?: number | null
         }
         Update: {
           category_id?: number | null
@@ -1086,6 +1088,7 @@ export type Database = {
           partner_price?: number | null
           price?: number
           product_id?: never
+          production_batch_id?: number | null
         }
         Relationships: [
           {
@@ -1094,6 +1097,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "category"
             referencedColumns: ["category_id"]
+          },
+          {
+            foreignKeyName: "product_production_batch_id_fkey"
+            columns: ["production_batch_id"]
+            isOneToOne: false
+            referencedRelation: "production_batch"
+            referencedColumns: ["production_batch_id"]
           },
         ]
       }
@@ -1239,6 +1249,144 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "production_batch"
             referencedColumns: ["production_batch_id"]
+          },
+        ]
+      }
+      production_run: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          food_truck_id: number
+          notes: string | null
+          opened_at: string
+          opened_by: string | null
+          production_batch_id: number
+          production_run_id: number
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          food_truck_id: number
+          notes?: string | null
+          opened_at?: string
+          opened_by?: string | null
+          production_batch_id: number
+          production_run_id?: never
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          food_truck_id?: number
+          notes?: string | null
+          opened_at?: string
+          opened_by?: string | null
+          production_batch_id?: number
+          production_run_id?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_run_closed_by_fkey"
+            columns: ["closed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_run_food_truck_id_fkey"
+            columns: ["food_truck_id"]
+            isOneToOne: false
+            referencedRelation: "food_truck"
+            referencedColumns: ["food_truck_id"]
+          },
+          {
+            foreignKeyName: "production_run_opened_by_fkey"
+            columns: ["opened_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_run_production_batch_id_fkey"
+            columns: ["production_batch_id"]
+            isOneToOne: false
+            referencedRelation: "production_batch"
+            referencedColumns: ["production_batch_id"]
+          },
+        ]
+      }
+      production_run_output: {
+        Row: {
+          created_at: string
+          food_truck_id: number
+          product_id: number
+          production_batch_id: number
+          production_run_id: number | null
+          production_run_output_id: number
+          profile_order_id: string | null
+          quantity: number
+        }
+        Insert: {
+          created_at?: string
+          food_truck_id: number
+          product_id: number
+          production_batch_id: number
+          production_run_id?: number | null
+          production_run_output_id?: never
+          profile_order_id?: string | null
+          quantity: number
+        }
+        Update: {
+          created_at?: string
+          food_truck_id?: number
+          product_id?: number
+          production_batch_id?: number
+          production_run_id?: number | null
+          production_run_output_id?: never
+          profile_order_id?: string | null
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_run_output_food_truck_id_fkey"
+            columns: ["food_truck_id"]
+            isOneToOne: false
+            referencedRelation: "food_truck"
+            referencedColumns: ["food_truck_id"]
+          },
+          {
+            foreignKeyName: "production_run_output_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "production_run_output_production_batch_id_fkey"
+            columns: ["production_batch_id"]
+            isOneToOne: false
+            referencedRelation: "production_batch"
+            referencedColumns: ["production_batch_id"]
+          },
+          {
+            foreignKeyName: "production_run_output_production_run_id_fkey"
+            columns: ["production_run_id"]
+            isOneToOne: false
+            referencedRelation: "production_run"
+            referencedColumns: ["production_run_id"]
+          },
+          {
+            foreignKeyName: "production_run_output_production_run_id_fkey"
+            columns: ["production_run_id"]
+            isOneToOne: false
+            referencedRelation: "v_production_run_summary"
+            referencedColumns: ["production_run_id"]
+          },
+          {
+            foreignKeyName: "production_run_output_profile_order_id_fkey"
+            columns: ["profile_order_id"]
+            isOneToOne: false
+            referencedRelation: "profile_has_order"
+            referencedColumns: ["profile_order_id"]
           },
         ]
       }
@@ -1789,6 +1937,36 @@ export type Database = {
         }
         Relationships: []
       }
+      v_production_run_summary: {
+        Row: {
+          batch_name: string | null
+          closed_at: string | null
+          food_truck_id: number | null
+          is_open: boolean | null
+          opened_at: string | null
+          orders_count: number | null
+          production_batch_id: number | null
+          production_run_id: number | null
+          truck_name: string | null
+          units_sold: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_run_food_truck_id_fkey"
+            columns: ["food_truck_id"]
+            isOneToOne: false
+            referencedRelation: "food_truck"
+            referencedColumns: ["food_truck_id"]
+          },
+          {
+            foreignKeyName: "production_run_production_batch_id_fkey"
+            columns: ["production_batch_id"]
+            isOneToOne: false
+            referencedRelation: "production_batch"
+            referencedColumns: ["production_batch_id"]
+          },
+        ]
+      }
       v_unread_notifications: {
         Row: {
           action_label: string | null
@@ -1845,6 +2023,15 @@ export type Database = {
       }
     }
     Functions: {
+      abrir_produccion: {
+        Args: {
+          p_foodtruck_id: number
+          p_notes?: string
+          p_production_batch_id: number
+          p_profile_id?: string
+        }
+        Returns: Json
+      }
       archive_notification: {
         Args: { notification_id: string; user_id: string }
         Returns: boolean
@@ -1856,6 +2043,10 @@ export type Database = {
       can_access_order_location: {
         Args: { p_location_id: number; p_profile_id?: string }
         Returns: boolean
+      }
+      cerrar_produccion: {
+        Args: { p_production_run_id: number; p_profile_id?: string }
+        Returns: Json
       }
       create_notification: {
         Args: {
@@ -1927,6 +2118,15 @@ export type Database = {
           p_batch_name: string
           p_food_truck_id: number
           p_items: Json
+          p_truck_name: string
+        }
+        Returns: undefined
+      }
+      notify_missing_production_run: {
+        Args: {
+          p_food_truck_id: number
+          p_items: Json
+          p_order_number: number
           p_truck_name: string
         }
         Returns: undefined

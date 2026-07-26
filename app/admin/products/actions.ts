@@ -102,6 +102,23 @@ export async function addProductIngredient(productId: number, ingredientId: numb
   revalidatePath("/dashboard");
 }
 
+/**
+ * Marca de qué lote de producción sale el producto (o lo desmarca).
+ *
+ * Con lote seteado, vender el producto NO descuenta ingredientes: suma una
+ * unidad a la corrida abierta de ese lote. Su receta queda como
+ * documentación (la materia prima ya se consumió al producir la tanda).
+ */
+export async function setProductBatch(productId: number, productionBatchId: number | null) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("product")
+    .update({ production_batch_id: productionBatchId })
+    .eq("product_id", productId);
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard");
+}
+
 export async function setProductCategory(productId: number, categoryId: number | null) {
   const supabase = await createClient();
   const { error } = await supabase

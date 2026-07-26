@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, Trash2, Package, ImagePlus, X, ExternalLink, Upload, Loader2, LayoutList, LayoutGrid, FlaskConical, Tag } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, ImagePlus, X, ExternalLink, Upload, Loader2, LayoutList, LayoutGrid, FlaskConical, Tag, Factory } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
@@ -21,7 +21,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-import { createProduct, updateProduct, deleteProduct, addProductImage, deleteProductImage, addProductType, deleteProductType, addProductIngredient, removeProductIngredient, setProductCategory } from "@/app/admin/products/actions";
+import { createProduct, updateProduct, deleteProduct, addProductImage, deleteProductImage, addProductType, deleteProductType, addProductIngredient, removeProductIngredient, setProductCategory, setProductBatch } from "@/app/admin/products/actions";
 import { SectionHeader } from "@/components/admin/section-header";
 
 export type ProductImage      = { product_image_id: number; image_url: string };
@@ -41,10 +41,14 @@ export type Product = {
   partner_price: number | null;
   category_id: number | null;
   category: { category_id: number; name: string } | null;
+  /** Si está seteado, el producto sale de producción y NO descuenta ingredientes al venderse. */
+  production_batch_id: number | null;
   product_has_image: ProductImage[];
   product_has_type: ProductType[];
   product_has_ingredient: ProductIngredient[];
 };
+
+export type AvailableBatch = { production_batch_id: number; name: string };
 
 const schema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
@@ -309,15 +313,31 @@ function TypesPanel({ product, onClose }: { product: Product; onClose: () => voi
 function IngredientsPanel({
   product,
   allIngredients,
+  allBatches,
   onClose,
 }: {
   product: Product;
   allIngredients: AvailableIngredient[];
+  allBatches: AvailableBatch[];
   onClose: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const [selectedIngId, setSelectedIngId] = useState("");
   const [quantity, setQuantity] = useState("");
+
+  const batchId = product.production_batch_id;
+  const fromBatch = batchId !== null;
+  const batchName = allBatches.find((b) => b.production_batch_id === batchId)?.name;
+
+  function handleBatchChange(value: string) {
+    const next = value === "none" ? null : Number(value);
+    startTransition(async () => {
+      const result = await setProductBatch(product.product_id, next);
+      if (result?.error) toast.error(result.error);
+      else if (next === null) toast.success("Ahora descuenta ingredientes al venderse");
+      else toast.success("Ahora se cuenta contra la producción del lote");
+    });
+  }
 
   const usedIds = new Set(product.product_has_ingredient.map((i) => i.ingredient.ingredient_id));
   const available = allIngredients.filter((i) => !usedIds.has(i.ingredient_id));
@@ -346,6 +366,46 @@ function IngredientsPanel({
         <DialogHeader>
           <DialogTitle>Receta — {product.name}</DialogTitle>
         </DialogHeader>
+
+        {/* De dónde sale la materia prima de este producto */}
+        <div className="space-y-2 rounded-xl border border-border p-3">
+          <Label className="text-xs">¿De dónde sale?</Label>
+          <Select value={batchId === null ? "none" : String(batchId)} onValueChange={handleBatchChange}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Inventario — descuenta su receta al venderse</SelectItem>
+              {allBatches.map((b) => (
+                <SelectItem key={b.production_batch_id} value={String(b.production_batch_id)}>
+                  Lote: {b.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {fromBatch ? (
+            <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+              <Factory className="w-3.5 h-3.5 text-primary shrink-0 mt-px" />
+              <span>
+                Sale del lote <strong className="text-foreground">{batchName}</strong>. Al venderse
+                suma 1 a la producción abierta y <strong>no descuenta ingredientes</strong> — la
+                materia prima ya se consumió al producir la tanda. La receta de abajo queda solo
+                como documentación.
+              </span>
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Al venderse descuenta del inventario del truck lo que diga la receta.
+            </p>
+          )}
+        </div>
+
+        {fromBatch && product.product_has_ingredient.length > 0 && (
+          <p className="text-xs font-medium text-muted-foreground">
+            Receta (informativa — no descuenta stock)
+          </p>
+        )}
 
         {product.product_has_ingredient.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">Sin ingredientes asignados</p>
@@ -670,7 +730,7 @@ function ProductCard({
   );
 }
 
-export function ProductsView({ products, allIngredients, allCategories }: { products: Product[]; allIngredients: AvailableIngredient[]; allCategories: AvailableCategory[] }) {
+export function ProductsView({ products, allIngredients, allCategories, allBatches = [] }: { products: Product[]; allIngredients: AvailableIngredient[]; allCategories: AvailableCategory[]; allBatches?: AvailableBatch[] }) {
   const [isPending, startTransition] = useTransition();
   const [view, setView] = useState<"list" | "grid">("grid");
   const [createOpen, setCreateOpen] = useState(false);
@@ -994,6 +1054,7 @@ export function ProductsView({ products, allIngredients, allCategories }: { prod
         <IngredientsPanel
           product={ingredientsProduct}
           allIngredients={allIngredients}
+          allBatches={allBatches}
           onClose={() => setIngredientsProduct(null)}
         />
       )}

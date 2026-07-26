@@ -18,7 +18,12 @@ import { PermisosView } from "@/components/admin/views/permisos-view";
 
 import { getTareas } from "@/lib/notion";
 import { TareasViews } from "@/app/admin/tareas/tareas-views";
-import { bogotaTodayStartISO, bogotaStartOfDayISO, bogotaEndOfDayISO } from "@/lib/utils/timezone";
+import {
+  bogotaTodayStartISO,
+  bogotaStartOfDayISO,
+  bogotaEndOfDayISO,
+  bogotaTodayDateString,
+} from "@/lib/utils/timezone";
 import { CheckpointButton } from "@/app/admin/tareas/checkpoint-button";
 import { SectionHeader } from "@/components/admin/section-header";
 import { getAccessibleLocations } from "@/app/dashboard/orders-actions";
@@ -38,6 +43,8 @@ export default async function DashboardPage({
     q?: string;
     from?: string;
     to?: string;
+    /** "all" desactiva el default de "hoy" en la sección de pedidos. */
+    range?: string;
     page?: string;
   }>;
 }) {
@@ -83,8 +90,19 @@ export default async function DashboardPage({
       const page = Math.max(1, Number(params.page) || 1);
       const statusFilter = params.status || "all";
       const q = (params.q || "").trim().replace(/[,()]/g, " ").trim();
-      const from = params.from || "";
-      const to = params.to || "";
+
+      // Por defecto la sección muestra SOLO los pedidos de hoy (Bogotá) — que es
+      // lo que se mira el 99% del tiempo durante el servicio. Se desactiva cuando:
+      //  - el usuario eligió fechas explícitas (?from / ?to)
+      //  - pidió ver todo el historial (?range=all)
+      //  - está buscando por cliente o # de pedido (buscar debe mirar todo el
+      //    historial, si no un #61 de la semana pasada "no existe")
+      const hasExplicitDates = !!(params.from || params.to);
+      const isDefaultRange = !hasExplicitDates && params.range !== "all" && !q;
+      const todayDate = bogotaTodayDateString();
+
+      const from = params.from || (isDefaultRange ? todayDate : "");
+      const to = params.to || (isDefaultRange ? todayDate : "");
 
       const truckFilter = params.truck ? Number(params.truck) : null;
 
@@ -228,6 +246,7 @@ export default async function DashboardPage({
           orders={(orders ?? []) as never}
           allStatuses={allStatuses ?? []}
           filters={{ status: statusFilter, q: params.q || "", from, to }}
+          isDefaultRange={isDefaultRange}
           page={page}
           totalPages={totalPages}
           totalCount={totalCount}
@@ -355,7 +374,7 @@ export default async function DashboardPage({
 
     // ============ LOTES DE PRODUCCIÓN ============
     case "catalog.lotes": {
-      const [{ data: batches }, { data: allIngredients }] = await Promise.all([
+      const [{ data: batches }, { data: allIngredients }, { data: runs }] = await Promise.all([
         supabase
           .from("production_batch")
           .select(
@@ -369,12 +388,33 @@ export default async function DashboardPage({
           )
           .order("name"),
         supabase.from("ingredient").select("ingredient_id, name, unit").order("name"),
+        // Corridas de producción — la abierta habilita el conteo de ventas.
+        // Puede no existir todavía si production_runs_and_sales.sql no corrió.
+        supabase
+          .from("v_production_run_summary")
+          .select("*")
+          .order("opened_at", { ascending: false })
+          .limit(50),
       ]);
+
+      // Ventas registradas sin producción abierta — esperan a que se abra la
+      // primera tanda para ser adoptadas. Si no se muestran, el staff no tiene
+      // forma de saber que están ahí.
+      const { data: pendingOutputs } = await supabase
+        .from("production_run_output")
+        .select("production_batch_id, food_truck_id, quantity, created_at, product(name)")
+        .is("production_run_id", null)
+        .order("created_at", { ascending: false })
+        .limit(200);
 
       return (
         <BatchesView
           batches={(batches ?? []) as unknown as import("@/components/admin/views/batches-view").Batch[]}
           allIngredients={allIngredients ?? []}
+          runs={(runs ?? []) as unknown as import("@/components/admin/views/batches-view").ProductionRun[]}
+          pendingOutputs={
+            (pendingOutputs ?? []) as unknown as import("@/components/admin/views/batches-view").PendingOutput[]
+          }
         />
       );
     }
@@ -391,12 +431,13 @@ export default async function DashboardPage({
 
     // ============ PRODUCTOS ============
     case "catalog.products": {
-      const [{ data: products }, { data: ingredients }, { data: categories }] = await Promise.all([
+      const [{ data: products }, { data: ingredients }, { data: categories }, { data: batches }] =
+        await Promise.all([
         supabase
           .from("product")
           .select(
             `
-            product_id, name, description, price, partner_price, category_id,
+            product_id, name, description, price, partner_price, category_id, production_batch_id,
             category(category_id, name),
             product_has_image(product_image_id, image_url),
             product_has_type(product_type_id, type),
@@ -409,6 +450,7 @@ export default async function DashboardPage({
           .order("product_id"),
         supabase.from("ingredient").select("ingredient_id, name, unit").order("name"),
         supabase.from("category").select("category_id, name").order("name"),
+        supabase.from("production_batch").select("production_batch_id, name").order("name"),
       ]);
 
       return (
@@ -416,6 +458,7 @@ export default async function DashboardPage({
           products={(products ?? []) as unknown as Product[]}
           allIngredients={ingredients ?? []}
           allCategories={categories ?? []}
+          allBatches={batches ?? []}
         />
       );
     }
