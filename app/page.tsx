@@ -24,6 +24,7 @@ export default function Home() {
       <ContactSection />
       <Footer />
       <WhatsappFloat />
+      <div className="hidden"></div>
     </main>
   )
 }
