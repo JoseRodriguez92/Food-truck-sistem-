@@ -23,6 +23,7 @@ import {
   ClipboardList,
   Receipt,
   Boxes,
+  ChefHat,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -44,6 +45,7 @@ interface Profile {
 const topLinks = [
   { section: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { section: "orders", label: "Pedidos", icon: ShoppingBag },
+  { section: "cocina", label: "Cocina", icon: ChefHat },
   { section: "tareas", label: "Tareas", icon: ClipboardList },
   { section: "expenses", label: "Gastos", icon: Receipt },
 ];

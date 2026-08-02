@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { DashboardSidebar } from "@/components/admin/dashboard-sidebar";
 import { PermissionsProvider } from "@/contexts/PermissionsContext";
 import { TruckStoreInit } from "@/components/admin/truck-store-init";
+import { OrdersRealtimeInit } from "@/components/admin/orders-realtime-init";
 
 export const metadata = { title: "Panel — 3 Street Food" };
 
@@ -19,7 +20,7 @@ export default async function DashboardLayout({
 
   if (!user) redirect("/login");
 
-  // Verificar rol — un usuario puede tener varios roles, alcanza con que uno sea admin/employ/socio
+  // Verificar rol — un usuario puede tener varios roles, alcanza con que uno sea admin/employ/socio/cocina
   const { data: roleRows } = await supabase
     .from("profile_has_role")
     .select("roles(name)")
@@ -29,7 +30,7 @@ export default async function DashboardLayout({
     const roles = r.roles as unknown as { name: string } | { name: string }[] | null;
     const role = Array.isArray(roles) ? roles[0] : roles;
     const code = role?.name?.toLowerCase();
-    return code === "admin" || code === "employ" || code === "socio";
+    return code === "admin" || code === "employ" || code === "socio" || code === "cocina";
   });
   if (!hasAccess) redirect("/client");
 
@@ -48,6 +49,7 @@ export default async function DashboardLayout({
   return (
     <PermissionsProvider>
       <TruckStoreInit trucks={trucks ?? []} />
+      <OrdersRealtimeInit />
       <div className="flex h-screen overflow-hidden bg-background">
         <Suspense fallback={null}>
           <DashboardSidebar profile={profile} />

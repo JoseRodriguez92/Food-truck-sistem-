@@ -15,6 +15,7 @@ import { ExpensesView } from "@/components/admin/views/expenses-view";
 import { UsersView } from "@/components/admin/views/users-view";
 import { RolesView } from "@/components/admin/views/roles-view";
 import { PermisosView } from "@/components/admin/views/permisos-view";
+import { CocinaView } from "@/components/admin/views/cocina-view";
 
 import { getTareas } from "@/lib/notion";
 import { TareasViews } from "@/app/admin/tareas/tareas-views";
@@ -253,6 +254,37 @@ export default async function DashboardPage({
           loadError={loadError}
         />
       );
+    }
+
+    // ============ COCINA ============
+    case "cocina": {
+      const todayStart = bogotaTodayStartISO();
+
+      const { data: orders } = await supabase
+        .from("profile_has_order")
+        .select(
+          `
+          profile_order_id, order_number, created_at, notes, status_order_id, customer_alias,
+          profiles!profile_has_order_profile_id_fkey(first_name, last_name, email),
+          status_order(status_order_id, name, code, sort_order),
+          location(name, food_truck(name)),
+          order_detail(
+            order_detail_id, quantity,
+            product(product_id, name),
+            combo(combo_id, name)
+          )
+        `,
+        )
+        .gte("created_at", todayStart)
+        .order("created_at", { ascending: false });
+
+      const { data: allStatuses } = await supabase
+        .from("status_order")
+        .select("status_order_id, name, code, sort_order")
+        .eq("is_active", true)
+        .order("sort_order");
+
+      return <CocinaView orders={(orders ?? []) as never} allStatuses={allStatuses ?? []} />;
     }
 
     // ============ TAREAS (Notion) ============

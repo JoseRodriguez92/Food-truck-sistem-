@@ -1,7 +1,13 @@
-// admin/employ/socio entran al panel — el resto (o sin rol) va al menú del cliente.
+// admin/employ/socio/cocina entran al panel — el resto (o sin rol) va al menú del cliente.
 export function getRedirectByRole(roleName: string): string {
   const normalized = roleName.toLowerCase().trim();
-  if (normalized === "admin" || normalized === "employ" || normalized === "socio") return "/dashboard";
+  if (
+    normalized === "admin" ||
+    normalized === "employ" ||
+    normalized === "socio" ||
+    normalized === "cocina"
+  )
+    return "/dashboard";
   return "/client";
 }
 
