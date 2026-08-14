@@ -71,14 +71,16 @@ function OrderItems({ items }: { items: CocinaOrder["order_detail"] }) {
   if (!items || items.length === 0) return null;
 
   return (
-    <ul className="mt-3 flex flex-col gap-1.5 border-t border-border pt-3">
+    <ul className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
       {items.map((item) => {
         const product = one(item.product);
         const combo = one(item.combo);
         return (
-          <li key={item.order_detail_id} className="flex items-baseline gap-2 text-sm">
-            <span className="font-semibold text-primary shrink-0">{item.quantity}×</span>
-            <span className="text-foreground">{product?.name ?? combo?.name ?? "—"}</span>
+          <li key={item.order_detail_id} className="flex items-baseline gap-2">
+            <span className="text-xl font-bold text-primary shrink-0">{item.quantity}×</span>
+            <span className="text-lg font-semibold text-foreground leading-tight">
+              {product?.name ?? combo?.name ?? "—"}
+            </span>
           </li>
         );
       })}

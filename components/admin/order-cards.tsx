@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { OrderStatusSelect } from "@/components/admin/order-status-select";
 import { cn } from "@/lib/utils";
+import { getOrderStatusStyle } from "@/lib/order-status";
 import type { OrderRow, OrderStatus } from "@/components/admin/views/orders-view";
 
 /** Ancho del panel de acciones que se revela al deslizar (2 botones). */
@@ -135,8 +136,11 @@ function OrderCard({
     ? `${profile.first_name} ${profile.last_name ?? ""}`.trim()
     : profile?.email;
 
+  const statusCode = allStatuses.find((s) => s.status_order_id === order.status_order_id)?.code ?? "";
+  const accent = getOrderStatusStyle(statusCode).accent;
+
   return (
-    <div className="relative overflow-hidden rounded-xl border border-border bg-card">
+    <div className={cn("relative overflow-hidden rounded-xl border border-border bg-card border-l-4", accent)}>
       {/* Acciones reveladas por el swipe */}
       <div className="absolute inset-y-0 right-0 flex" style={{ width: ACTIONS_WIDTH }}>
         <button
@@ -222,6 +226,12 @@ function OrderCard({
             />
           </div>
         </div>
+
+        {order.notes && (
+          <p className="mt-2 rounded-lg bg-secondary/60 px-2.5 py-1.5 text-xs text-muted-foreground">
+            {order.notes}
+          </p>
+        )}
 
         <div className="mt-3">
           <OrderStatusSelect

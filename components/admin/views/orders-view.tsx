@@ -618,6 +618,7 @@ export function OrdersView({
                   <TableHead className="w-20"># Pedido</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead className="hidden md:table-cell">Ubicación</TableHead>
+                  <TableHead className="hidden lg:table-cell">Descripción</TableHead>
                   <TableHead className="hidden sm:table-cell">Fecha</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead>Estado</TableHead>
@@ -659,6 +660,12 @@ export function OrdersView({
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                         {locationLabel(orderLocation)}
+                      </TableCell>
+                      <TableCell
+                        className="hidden lg:table-cell text-sm text-muted-foreground max-w-48 truncate"
+                        title={order.notes ?? undefined}
+                      >
+                        {order.notes || "—"}
                       </TableCell>
                       <TableCell className="hidden sm:table-cell text-sm text-muted-foreground" suppressHydrationWarning>
                         {formatDateTime(order.created_at)}

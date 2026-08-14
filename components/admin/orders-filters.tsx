@@ -18,6 +18,7 @@ import { CalendarDays, Search, SlidersHorizontal, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -26,12 +27,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 export type QuickRange = "today" | "last7" | "month" | "all";
 
@@ -81,45 +82,58 @@ export function OrdersFiltersBody({
         </p>
       )}
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Cliente o # pedido..."
-            value={q}
-            onChange={(e) => onQChange(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && onSearch()}
-            className="pl-8"
-          />
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="of-search" className="text-xs text-muted-foreground">
+            Cliente o # pedido
+          </Label>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Input
+              id="of-search"
+              placeholder="Buscar..."
+              value={q}
+              onChange={(e) => onQChange(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && onSearch()}
+              className="pl-8"
+            />
+          </div>
         </div>
 
-        <Select value={status} onValueChange={onStatusChange}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            {statuses.map((s) => (
-              <SelectItem key={s.status_order_id} value={s.status_order_id}>
-                {s.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="space-y-1.5">
+          <Label htmlFor="of-status" className="text-xs text-muted-foreground">
+            Estado
+          </Label>
+          <Select value={status} onValueChange={onStatusChange}>
+            <SelectTrigger id="of-status" className="w-full">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              {statuses.map((s) => (
+                <SelectItem key={s.status_order_id} value={s.status_order_id}>
+                  {s.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <Input
-          type="date"
-          value={from}
-          onChange={(e) => onFromChange(e.target.value)}
-          placeholder="Desde"
-        />
+        <div className="grid grid-cols-2 gap-3 sm:col-span-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="of-from" className="text-xs text-muted-foreground">
+              Desde
+            </Label>
+            <Input id="of-from" type="date" value={from} onChange={(e) => onFromChange(e.target.value)} />
+          </div>
 
-        <Input
-          type="date"
-          value={to}
-          onChange={(e) => onToChange(e.target.value)}
-          placeholder="Hasta"
-        />
+          <div className="space-y-1.5">
+            <Label htmlFor="of-to" className="text-xs text-muted-foreground">
+              Hasta
+            </Label>
+            <Input id="of-to" type="date" value={to} onChange={(e) => onToChange(e.target.value)} />
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 justify-between">
@@ -180,8 +194,8 @@ export function OrdersFiltersSheet({
   activeCount: number;
 }) {
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetTrigger asChild>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger asChild>
         <Button
           type="button"
           variant="outline"
@@ -196,21 +210,19 @@ export function OrdersFiltersSheet({
             </span>
           )}
         </Button>
-      </SheetTrigger>
+      </DialogTrigger>
 
-      <SheetContent
-        side="bottom"
-        className="rounded-t-2xl border-border max-h-[85dvh] overflow-y-auto gap-0"
-      >
-        <SheetHeader className="pb-2">
-          <SheetTitle className="flex items-center gap-2">
-            <SlidersHorizontal className="w-4 h-4 text-primary" /> Filtrar pedidos
-          </SheetTitle>
-        </SheetHeader>
-        <div className="px-4 pb-6">
-          <OrdersFiltersBody {...bodyProps} />
-        </div>
-      </SheetContent>
-    </Sheet>
+      <DialogContent className="max-h-[85dvh] overflow-y-auto rounded-2xl sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <SlidersHorizontal className="w-4 h-4 text-primary" />
+            </span>
+            Filtrar pedidos
+          </DialogTitle>
+        </DialogHeader>
+        <OrdersFiltersBody {...bodyProps} />
+      </DialogContent>
+    </Dialog>
   );
 }
