@@ -15,6 +15,7 @@ import {
   FlaskConical,
   PackagePlus,
   History,
+  PackageSearch,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -187,8 +188,10 @@ function stockBadge(stock: number, unit: string) {
 
 export function IngredientsView({
   ingredients,
+  usedIngredientIds,
 }: {
   ingredients: Ingredient[];
+  usedIngredientIds: number[];
 }) {
   const selectedTruck = useSelectedTruckStore((s) => s.selectedTruck);
   const [isPending, startTransition] = useTransition();
@@ -210,6 +213,11 @@ export function IngredientsView({
   const [createUnit, setCreateUnit] = useState("gr");
   const [editUnit, setEditUnit] = useState("gr");
   const [search, setSearch] = useState("");
+  const [unusedOnly, setUnusedOnly] = useState(false);
+
+  const usedIdsSet = new Set(usedIngredientIds);
+  const isUnused = (ingredientId: number) => !usedIdsSet.has(ingredientId);
+  const unusedCount = ingredients.filter((ing) => isUnused(ing.ingredient_id)).length;
 
   // Fetch stock para truck seleccionado
   useEffect(() => {
@@ -281,11 +289,9 @@ export function IngredientsView({
   }
 
   const normalizedSearch = search.trim().toLowerCase();
-  const filteredIngredients = normalizedSearch
-    ? ingredientsWithStock.filter((ing) =>
-        ing.name.toLowerCase().includes(normalizedSearch),
-      )
-    : ingredientsWithStock;
+  const filteredIngredients = ingredientsWithStock
+    .filter((ing) => !normalizedSearch || ing.name.toLowerCase().includes(normalizedSearch))
+    .filter((ing) => !unusedOnly || isUnused(ing.ingredient_id));
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -306,8 +312,8 @@ export function IngredientsView({
         }
       />
 
-      <div className="rounded-xl border border-border p-3">
-        <div className="relative max-w-xl">
+      <div className="rounded-xl border border-border p-3 flex flex-col sm:flex-row gap-2">
+        <div className="relative max-w-xl flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
             value={search}
@@ -327,6 +333,18 @@ export function IngredientsView({
             </Button>
           )}
         </div>
+
+        <Button
+          type="button"
+          variant={unusedOnly ? "default" : "outline"}
+          size="sm"
+          onClick={() => setUnusedOnly((v) => !v)}
+          className="gap-2 shrink-0"
+          disabled={unusedCount === 0}
+        >
+          <PackageSearch className="w-3.5 h-3.5" />
+          Sin asociar a productos ({unusedCount})
+        </Button>
       </div>
 
       {/* Tabla */}
@@ -385,6 +403,14 @@ export function IngredientsView({
                         <FlaskConical className="w-3.5 h-3.5 text-primary" />
                       </div>
                       <span className="font-medium text-sm">{ing.name}</span>
+                      {isUnused(ing.ingredient_id) && (
+                        <span
+                          title="No está asociado a ningún producto"
+                          className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium border bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+                        >
+                          Sin usar
+                        </span>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>

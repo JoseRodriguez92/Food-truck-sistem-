@@ -272,6 +272,10 @@ export default async function DashboardPage({
             order_detail_id, quantity,
             product(product_id, name),
             combo(combo_id, name)
+          ),
+          order_has_status(
+            changed_at,
+            status_order(code)
           )
         `,
         )
@@ -396,12 +400,19 @@ export default async function DashboardPage({
 
     // ============ INGREDIENTES ============
     case "catalog.ingredients": {
-      const { data: ingredients } = await supabase
-        .from("ingredient")
-        .select("ingredient_id, name, unit, description, created_at")
-        .order("name");
+      const [{ data: ingredients }, { data: usedRows }] = await Promise.all([
+        supabase
+          .from("ingredient")
+          .select("ingredient_id, name, unit, description, created_at")
+          .order("name"),
+        // Ingredientes referenciados en alguna receta de producto — el resto
+        // no está asociado a ningún producto (candidato a revisar/limpiar).
+        supabase.from("product_has_ingredient").select("ingredient_id"),
+      ]);
 
-      return <IngredientsView ingredients={ingredients ?? []} />;
+      const usedIngredientIds = Array.from(new Set((usedRows ?? []).map((r) => r.ingredient_id)));
+
+      return <IngredientsView ingredients={ingredients ?? []} usedIngredientIds={usedIngredientIds} />;
     }
 
     // ============ LOTES DE PRODUCCIÓN ============

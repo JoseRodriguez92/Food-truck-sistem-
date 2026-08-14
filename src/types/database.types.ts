@@ -373,6 +373,48 @@ export type Database = {
         }
         Relationships: []
       }
+      ingredient_stock_daily_snapshot: {
+        Row: {
+          created_at: string
+          foodtruck_id: number
+          ingredient_id: number
+          snapshot_date: string
+          snapshot_id: number
+          stock: number
+        }
+        Insert: {
+          created_at?: string
+          foodtruck_id: number
+          ingredient_id: number
+          snapshot_date: string
+          snapshot_id?: number
+          stock: number
+        }
+        Update: {
+          created_at?: string
+          foodtruck_id?: number
+          ingredient_id?: number
+          snapshot_date?: string
+          snapshot_id?: number
+          stock?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ingredient_stock_daily_snapshot_foodtruck_id_fkey"
+            columns: ["foodtruck_id"]
+            isOneToOne: false
+            referencedRelation: "food_truck"
+            referencedColumns: ["food_truck_id"]
+          },
+          {
+            foreignKeyName: "ingredient_stock_daily_snapshot_ingredient_id_fkey"
+            columns: ["ingredient_id"]
+            isOneToOne: false
+            referencedRelation: "ingredient"
+            referencedColumns: ["ingredient_id"]
+          },
+        ]
+      }
       ingredient_stock_movement: {
         Row: {
           created_at: string
@@ -2088,6 +2130,7 @@ export type Database = {
       }
       is_admin: { Args: { p_profile_id?: string }; Returns: boolean }
       is_admin_user: { Args: never; Returns: boolean }
+      is_staff: { Args: { p_profile_id?: string }; Returns: boolean }
       mark_all_notifications_as_read: {
         Args: { user_id: string }
         Returns: number
@@ -2148,6 +2191,7 @@ export type Database = {
         Args: { p_profile_order_id: string }
         Returns: undefined
       }
+      snapshot_ingredient_stock: { Args: never; Returns: undefined }
     }
     Enums: {
       unidad_medida_enum:

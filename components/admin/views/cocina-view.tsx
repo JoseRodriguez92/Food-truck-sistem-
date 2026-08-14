@@ -21,6 +21,11 @@ type CocinaOrderItem = {
   combo: { combo_id: number; name: string } | { combo_id: number; name: string }[] | null;
 };
 
+type CocinaStatusHistoryEntry = {
+  changed_at: string;
+  status_order: { code: string } | { code: string }[] | null;
+};
+
 export type CocinaOrder = {
   profile_order_id: string;
   order_number: number;
@@ -38,6 +43,7 @@ export type CocinaOrder = {
     | { name: string; food_truck: { name: string } | { name: string }[] | null }[]
     | null;
   order_detail: CocinaOrderItem[] | null;
+  order_has_status: CocinaStatusHistoryEntry[] | null;
 };
 
 // Estados reales en status_order: pending, confirmed, preparing, ready,
@@ -45,11 +51,37 @@ export type CocinaOrder = {
 // "entrante" (todavía no se entregó) y "entregada". El paso por
 // "preparing" (que descuenta inventario) pasa solo, automático, al
 // deslizar — no se muestra como estado propio en la UI de Cocina.
-const ENTRANTE_CODES = new Set(["pending", "confirmed", "preparing"]);
-
+//
+// Clasificar por el status_order_id ACTUAL nomás rompe con "confirmed":
+// un mesero puede confirmar el pago (status → confirmed) DESPUÉS de
+// que cocina ya entregó — eso resucitaba el pedido en Entrantes aunque
+// ya estaba servido. Fix: mirar el hito de cocina más reciente en el
+// historial (order_has_status), ignorando confirmed/pending/cancelled/
+// etc — esos no son responsabilidad de Cocina y no deberían mover nada
+// acá. Solo "preparing" (revertido explícito) y "delivered" cuentan.
 function statusCode(order: CocinaOrder): string | null {
   const status = Array.isArray(order.status_order) ? order.status_order[0] : order.status_order;
   return status?.code ?? null;
+}
+
+function latestKitchenMilestone(order: CocinaOrder): "preparing" | "delivered" | null {
+  const history = order.order_has_status ?? [];
+  let latestCode: "preparing" | "delivered" | null = null;
+  let latestAt = -Infinity;
+
+  for (const entry of history) {
+    const s = Array.isArray(entry.status_order) ? entry.status_order[0] : entry.status_order;
+    const code = s?.code;
+    if (code !== "preparing" && code !== "delivered") continue;
+
+    const at = new Date(entry.changed_at).getTime();
+    if (at > latestAt) {
+      latestAt = at;
+      latestCode = code;
+    }
+  }
+
+  return latestCode;
 }
 
 function CocinaOrderList({
@@ -128,8 +160,13 @@ export function CocinaView({
   const preparingStatus = useMemo(() => allStatuses.find((s) => s.code === "preparing") ?? null, [allStatuses]);
   const deliveredStatus = useMemo(() => allStatuses.find((s) => s.code === "delivered") ?? null, [allStatuses]);
 
-  const entrantes = useMemo(() => orders.filter((o) => ENTRANTE_CODES.has(statusCode(o) ?? "")), [orders]);
-  const entregadas = useMemo(() => orders.filter((o) => statusCode(o) === "delivered"), [orders]);
+  // Cancelado no es responsabilidad de Cocina — no aparece en ninguna tab acá.
+  const entrantes = useMemo(
+    () =>
+      orders.filter((o) => statusCode(o) !== "cancelled" && latestKitchenMilestone(o) !== "delivered"),
+    [orders],
+  );
+  const entregadas = useMemo(() => orders.filter((o) => latestKitchenMilestone(o) === "delivered"), [orders]);
 
   const advanceAction: CocinaAction | null =
     preparingStatus && deliveredStatus ? { mode: "advance", preparingStatus, deliveredStatus } : null;
